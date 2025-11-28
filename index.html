@@ -235,6 +235,40 @@ load30DayChart();
 
 // Refresh valori la 15 secunde
 setInterval(updateCards, 15000);
+//------------------------------------------------
+// REFRESH AUTOMAT GRAFICE
+//------------------------------------------------
+
+// Refresh grafic LIVE la fiecare 15 secunde
+setInterval(() => {
+    // Ștergem graficul vechi
+    document.getElementById("chartLive").remove();
+    let canvas = document.createElement("canvas");
+    canvas.id = "chartLive";
+    document.getElementById("charts-container").prepend(canvas);
+
+    loadLiveChart();
+}, 15000);
+
+// Refresh grafice 7 zile / 30 zile la fiecare 5 minute
+setInterval(() => {
+
+    // 7 zile
+    document.getElementById("chart7").remove();
+    let c7 = document.createElement("canvas");
+    c7.id = "chart7";
+    document.getElementById("charts-container").append(c7);
+
+    // 30 zile
+    document.getElementById("chart30").remove();
+    let c30 = document.createElement("canvas");
+    c30.id = "chart30";
+    document.getElementById("charts-container").append(c30);
+
+    load7DayChart();
+    load30DayChart();
+
+}, 5 * 60 * 1000); // 5 minute
 
 </script>
 
