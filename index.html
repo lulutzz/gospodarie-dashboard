@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<title>Dashboard Gospodărie</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+    body {
+        background: #121212;
+        color: #fff;
+        font-family: Arial;
+        margin: 0;
+        padding: 20px;
+    }
+    .title {
+        text-align: center;
+        font-size: 28px;
+        font-weight: bold;
+        margin-bottom: 20px;
+    }
+    .container {
+        display: flex;
+        justify-content: center;
+        gap: 20px;
+        flex-wrap: wrap;
+    }
+    .card {
+        background: #1f1f1f;
+        padding: 20px;
+        border-radius: 12px;
+        width: 260px;
+        text-align: center;
+        box-shadow: 0 2px 10px #000;
+    }
+    .label {
+        font-size: 20px;
+        opacity: 0.7;
+    }
+    .value {
+        font-size: 44px;
+        margin-top: 10px;
+        font-weight: bold;
+    }
+    canvas {
+        margin-top: 40px;
+    }
+</style>
+</head>
+
+<body>
+
+<div class="title">🌡️ Dashboard Gospodărie – Temperatură & Umezeală</div>
+
+<div class="container">
+    <div class="card">
+        <div class="label">Temperatură</div>
+        <div class="value" id="tempValue">-- °C</div>
+    </div>
+
+    <div class="card">
+        <div class="label">Umezeală</div>
+        <div class="value" id="humValue">-- %</div>
+    </div>
+</div>
+
+<canvas id="chart" width="400" height="200"></canvas>
+
+<script>
+const CHANNEL_ID = 1613849;   // ←–––––––––––– pune ID-ul canalului tău
+const API_KEY = "ZPT57WZJNMLGM2X1"; // ←–––––––––––– pune READ API KEY
+
+function updateValues() {
+    fetch(`https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?api_key=${API_KEY}&results=1`)
+        .then(r => r.json())
+        .then(data => {
+            let feed = data.feeds[0];
+            document.getElementById("tempValue").innerHTML = feed.field1 + "°C";
+            document.getElementById("humValue").innerHTML = feed.field2 + "%";
+        });
+}
+
+function loadChart() {
+    fetch(`https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?api_key=${API_KEY}&results=50`)
+        .then(r => r.json())
+        .then(data => {
+            let labels = data.feeds.map(x => x.created_at.substring(11, 19));
+            let temp = data.feeds.map(x => Number(x.field1));
+            let hum  = data.feeds.map(x => Number(x.field2));
+
+            let ctx = document.getElementById("chart").getContext("2d");
+            new Chart(ctx, {
+                type: "line",
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: "Temperatura (°C)",
+                            data: temp,
+                            borderColor: "red",
+                            tension: 0.3
+                        },
+                        {
+                            label: "Umezeala (%)",
+                            data: hum,
+                            borderColor: "cyan",
+                            tension: 0.3
+                        }
+                    ]
+                },
+                options: {
+                    plugins: {
+                        legend: { labels: { color: "#fff" } }
+                    },
+                    scales: {
+                        x: { ticks: { color: "#fff" } },
+                        y: { ticks: { color: "#fff" } }
+                    }
+                }
+            });
+        });
+}
+
+updateValues();
+loadChart();
+
+// Actualizare valori la fiecare 15 secunde
+setInterval(updateValues, 15000);
+</script>
+
+</body>
+</html>
