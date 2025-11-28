@@ -2,273 +2,326 @@
 <html lang="ro">
 <head>
 <meta charset="UTF-8">
-<title>Dashboard Gospodărie – PRO</title>
+<title>Dashboard Cameră Rece – PRO</title>
+
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
-    body {
-        background: #111;
-        color: #fff;
-        font-family: Arial;
-        padding: 20px;
-    }
+body {
+    background: #0d0d0d;
+    color: #fff;
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+}
+h1 {
+    text-align: center;
+    margin-bottom: 30px;
+    font-size: 28px;
+    color: #b7d4ff;
+}
+.cards {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 25px;
+    margin-bottom: 30px;
+}
+.card {
+    background: #141414;
+    padding: 20px;
+    width: 320px;
+    border-radius: 14px;
+    box-shadow: 0 0 18px rgba(0, 153, 255, 0.25);
+}
+.card h2 {
+    font-size: 22px;
+    margin-bottom: 5px;
+    color: #a8cfff;
+}
+.value {
+    font-size: 46px;
+    font-weight: bold;
+}
+.sub {
+    margin-top: 8px;
+    font-size: 15px;
+    opacity: 0.85;
+}
+.trend-up { color: #00ff88; }
+.trend-down { color: #ff4444; }
+.trend-stable { color: #cccccc; }
 
-    .title {
-        text-align: center;
-        font-size: 28px;
-        margin-bottom: 25px;
-        font-weight: bold;
-        color: #ffcc66;
-    }
+.status-box {
+    margin-top: 10px;
+    font-size: 15px;
+}
 
-    .cards {
-        display: flex;
-        justify-content: center;
-        gap: 20px;
-        flex-wrap: wrap;
-        margin-bottom: 40px;
-    }
+.safe { color: #00ff88; }
+.warning { color: #ffaa00; }
+.danger { color: #ff4444; }
 
-    .card {
-        background: #1a1a1a;
-        padding: 20px;
-        border-radius: 12px;
-        width: 260px;
-        text-align: center;
-        transition: 0.3s ease;
-        box-shadow: 0 0 20px #000;
-    }
+.mini-chart {
+    width: 100%;
+    height: 60px;
+}
 
-    .label {
-        font-size: 18px;
-        opacity: 0.7;
-    }
+.graph-container {
+    max-width: 1000px;
+    margin: auto;
+    margin-top: 40px;
+}
 
-    .value {
-        font-size: 46px;
-        font-weight: bold;
-        margin-top: 10px;
-    }
-
-    /* Animație puls */
-    .pulse {
-        animation: pulseAnim 0.5s ease-in-out;
-    }
-
-    @keyframes pulseAnim {
-        0% { transform: scale(1); }
-        50% { transform: scale(1.06); }
-        100% { transform: scale(1); }
-    }
-
-    /* ALERTA */
-    .alert {
-        border: 2px solid red;
-        box-shadow: 0 0 10px red;
-    }
-
-    #charts-container {
-        max-width: 1000px;
-        margin: auto;
-    }
-
-    canvas {
-        margin-top: 40px;
-    }
+.day-cards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    justify-content: center;
+    margin-top: 40px;
+}
+.day-card {
+    background: #151515;
+    padding: 15px;
+    border-radius: 12px;
+    width: 180px;
+    box-shadow: 0 0 12px rgba(0, 153, 255, 0.2);
+    font-size: 14px;
+}
+.day-card strong {
+    color: #8fbaff;
+}
 </style>
 </head>
 
 <body>
 
-<div class="title">🌡️ Dashboard Gospodărie – Temperatură & Umezeală (PRO)</div>
+<h1>🌡️ Dashboard Cameră Rece – Temperatură & Umiditate (PRO)</h1>
 
 <div class="cards">
-    <div class="card" id="tempCard">
-        <div class="label">Temperatură</div>
-        <div class="value" id="tempValue">-- °C</div>
+
+    <!-- CARD TEMPERATURĂ -->
+    <div class="card">
+        <h2>Temperatură</h2>
+        <div class="value" id="tempValue">--°C</div>
+        <div class="sub">
+            Min azi: <span id="tempMin">--</span>°C |
+            Max azi: <span id="tempMax">--</span>°C
+        </div>
+        <div class="sub">Trend: <span id="tempTrend">--</span></div>
+
+        <canvas id="miniTemp" class="mini-chart"></canvas>
     </div>
 
-    <div class="card" id="humCard">
-        <div class="label">Umezeală</div>
-        <div class="value" id="humValue">-- %</div>
+    <!-- CARD UMIDITATE -->
+    <div class="card">
+        <h2>Umiditate</h2>
+        <div class="value" id="humValue">--%</div>
+
+        <div class="sub">
+            Min azi: <span id="humMin">--</span>% |
+            Max azi: <span id="humMax">--</span>%
+        </div>
+
+        <div class="status-box">Risc mucegai: <span id="moldRisk">--</span></div>
+        <div class="status-box">Risc condens: <span id="condRisk">--</span></div>
+
+        <canvas id="miniHum" class="mini-chart"></canvas>
     </div>
+
 </div>
 
-<div id="charts-container">
-    <canvas id="chartLive"></canvas>
-    <canvas id="chart7"></canvas>
-    <canvas id="chart30"></canvas>
+<!-- GRAFICE MARI -->
+<div class="graph-container">
+    <canvas id="tempChart"></canvas>
+    <canvas id="humChart"></canvas>
 </div>
+
+<!-- ZILE ANTERIOARE -->
+<h2 style="text-align:center;margin-top:50px;color:#8fbaff;">📅 Min/Max ultimele 7 zile</h2>
+<div class="day-cards" id="dayCards"></div>
 
 <script>
-const CHANNEL_ID = 1613849;  // ← pune ID-ul tău
-const API_KEY = "ZPT57WZJNMLGM2X1"; // ← pune READ API KEY
+const CHANNEL_ID = 1613849;
+const API_KEY = "ZPT57WZJNMLGM2X1";
 
-//------------------------------------------------
-// UPDATE VALORI LIVE + ANIMAȚIE + ALERTE
-//------------------------------------------------
+// ------- FUNCȚII UTILE -------
+function trendIcon(valueNow, valuePrev) {
+    if (!valuePrev) return "→";
+    if (valueNow > valuePrev) return "<span class='trend-up'>↑</span>";
+    if (valueNow < valuePrev) return "<span class='trend-down'>↓</span>";
+    return "<span class='trend-stable'>→</span>";
+}
+
+function moldRisk(hum) {
+    if (hum >= 70) return "<span class='danger'>DA</span>";
+    if (hum >= 60) return "<span class='warning'>MEDIU</span>";
+    return "<span class='safe'>NU</span>";
+}
+
+function condRisk(hum, temp) {
+    if (hum >= 70 && temp < 18) return "<span class='danger'>DA</span>";
+    if (hum >= 60 && temp < 18) return "<span class='warning'>POSIBIL</span>";
+    return "<span class='safe'>NU</span>";
+}
+
+// -----------------------------
+// CARDURI + MIN/MAX ZILNIC
+// -----------------------------
+let lastTemp = null;
+
 function updateCards() {
-    fetch(`https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?api_key=${API_KEY}&results=1`)
-        .then(r => r.json())
-        .then(data => {
+    fetch(`https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?api_key=${API_KEY}&results=48`)
+    .then(r=>r.json())
+    .then(data=>{
+        const feeds = data.feeds;
+        const last = feeds[feeds.length - 1];
 
-            let feed = data.feeds[0];
-            let temp = Number(feed.field1);
-            let hum  = Number(feed.field2);
+        const temp = Number(last.field1);
+        const hum  = Number(last.field2);
 
-            let tempCard = document.getElementById("tempCard");
-            let humCard  = document.getElementById("humCard");
+        // afișez temperatură și umiditate
+        document.getElementById("tempValue").innerHTML = temp + "°C";
+        document.getElementById("humValue").innerHTML  = hum + "%";
 
-            // Actualizare valori
-            document.getElementById("tempValue").innerHTML = temp + "°C";
-            document.getElementById("humValue").innerHTML  = hum + "%";
+        // trend
+        document.getElementById("tempTrend").innerHTML = trendIcon(temp, lastTemp);
+        lastTemp = temp;
 
-            // Animație puls
-            tempCard.classList.add("pulse");
-            humCard.classList.add("pulse");
-            setTimeout(() => {
-                tempCard.classList.remove("pulse");
-                humCard.classList.remove("pulse");
-            }, 400);
+        // min/max azi
+        let today = new Date().toISOString().slice(0,10);
+        let todayData = feeds.filter(f=>f.created_at.startsWith(today));
 
-            //----------------------
-            // SISTEM ALERTĂ
-            //----------------------
+        let temps = todayData.map(f=>Number(f.field1));
+        let hums  = todayData.map(f=>Number(f.field2));
 
-            // ALERTĂ TEMPERATURĂ
-            if (temp >= 35) {
-                tempCard.classList.add("alert");
-            } else {
-                tempCard.classList.remove("alert");
-            }
+        document.getElementById("tempMin").innerHTML = Math.min(...temps).toFixed(1);
+        document.getElementById("tempMax").innerHTML = Math.max(...temps).toFixed(1);
 
-            // ALERTĂ UMIDITATE
-            if (hum <= 30) {
-                humCard.classList.add("alert");
-            } else {
-                humCard.classList.remove("alert");
-            }
-        });
+        document.getElementById("humMin").innerHTML = Math.min(...hums).toFixed(0);
+        document.getElementById("humMax").innerHTML = Math.max(...hums).toFixed(0);
+
+        // riscuri
+        document.getElementById("moldRisk").innerHTML = moldRisk(hum);
+        document.getElementById("condRisk").innerHTML = condRisk(hum, temp);
+
+        // mini grafice
+        drawMiniChart("miniTemp", feeds.map(f=>Number(f.field1)));
+        drawMiniChart("miniHum", feeds.map(f=>Number(f.field2)));
+    });
 }
 
-//------------------------------------------------
-// GRAFIC LIVE (ultimele 50 valori)
-//------------------------------------------------
-function loadLiveChart() {
-    fetch(`https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?api_key=${API_KEY}&results=50`)
-        .then(r => r.json())
-        .then(data => {
-
-            let labels = data.feeds.map(x => x.created_at.substring(11, 19));
-            let T = data.feeds.map(x => Number(x.field1));
-            let H = data.feeds.map(x => Number(x.field2));
-
-            new Chart(document.getElementById("chartLive"), {
-                type: "line",
-                data: {
-                    labels: labels,
-                    datasets: [
-                        { label: "Temperatură (°C)", data: T, borderColor: "red", tension: 0.3 },
-                        { label: "Umezeală (%)", data: H, borderColor: "cyan", tension: 0.3 }
-                    ]
-                },
-                options: { scales: { x: { ticks: { color: "#fff" } }, y: { ticks: { color: "#fff" } } } }
-            });
-        });
+// -----------------------------
+// MINI GRAFICE
+// -----------------------------
+function drawMiniChart(id, vals){
+    new Chart(document.getElementById(id), {
+        type: "line",
+        data: {
+            labels: vals.map((v,i)=>i),
+            datasets: [{
+                data: vals,
+                borderColor: "#00bfff",
+                borderWidth: 2,
+                pointRadius: 0,
+                tension: 0.3
+            }]
+        },
+        options:{ plugins:{legend:{display:false}}, scales:{x:{display:false},y:{display:false}} }
+    });
 }
 
-//------------------------------------------------
-// GRAFIC 7 ZILE
-//------------------------------------------------
-function load7DayChart() {
+// -----------------------------
+// GRAFIC MARE TEMPERATURĂ
+// -----------------------------
+function drawTempChart() {
+    fetch(`https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?api_key=${API_KEY}&results=48`)
+    .then(r=>r.json())
+    .then(data=>{
+        let labels = data.feeds.map(f=>f.created_at.slice(11,16));
+        let vals = data.feeds.map(f=>Number(f.field1));
+        new Chart(document.getElementById("tempChart"), {
+            type:"line",
+            data:{ labels: labels, datasets:[{ label:"Temperatură 24h", data:vals, borderColor:"#33aaff", tension:0.3 }] },
+            options:{ scales:{x:{ticks:{color:"#fff"}},y:{ticks:{color:"#fff"}}} }
+        });
+    });
+}
+
+// -----------------------------
+// GRAFIC MARE UMIDITATE
+// -----------------------------
+function drawHumChart() {
+    fetch(`https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?api_key=${API_KEY}&results=48`)
+    .then(r=>r.json())
+    .then(data=>{
+        let labels = data.feeds.map(f=>f.created_at.slice(11,16));
+        let vals = data.feeds.map(f=>Number(f.field2));
+        new Chart(document.getElementById("humChart"), {
+            type:"line",
+            data:{ labels: labels, datasets:[{ label:"Umiditate 24h", data:vals, borderColor:"#55e0ff", tension:0.3 }] },
+            options:{ scales:{x:{ticks:{color:"#fff"}},y:{ticks:{color:"#fff"}}} }
+        });
+    });
+}
+
+// -----------------------------
+// 7 ZILE MIN/MAX
+// -----------------------------
+function loadDailyStats() {
     fetch(`https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?api_key=${API_KEY}&days=7`)
-        .then(r => r.json())
-        .then(data => {
+    .then(r=>r.json())
+    .then(data=>{
+        let feeds = data.feeds;
+        let byDate = {};
 
-            let labels = data.feeds.map(x => x.created_at.substring(0, 10));
-            let T = data.feeds.map(x => Number(x.field1));
-
-            new Chart(document.getElementById("chart7"), {
-                type: "line",
-                data: {
-                    labels: labels,
-                    datasets: [
-                        { label: "Temperatură 7 zile", data: T, borderColor: "orange", tension: 0.2 }
-                    ]
-                },
-                options: { scales: { x: { ticks: { color: "#fff" } }, y: { ticks: { color: "#fff" } } } }
-            });
+        feeds.forEach(f=>{
+            let d = f.created_at.slice(0,10);
+            if(!byDate[d]) byDate[d] = {T:[],H:[]};
+            byDate[d].T.push(Number(f.field1));
+            byDate[d].H.push(Number(f.field2));
         });
+
+        let container = document.getElementById("dayCards");
+        container.innerHTML = "";
+
+        Object.keys(byDate).slice(-7).forEach(day=>{
+            let t = byDate[day].T;
+            let h = byDate[day].H;
+            container.innerHTML += `
+            <div class="day-card">
+                <strong>${day}</strong><br>
+                T: min ${Math.min(...t).toFixed(1)}° / max ${Math.max(...t).toFixed(1)}°<br>
+                H: min ${Math.min(...h).toFixed(0)}% / max ${Math.max(...h).toFixed(0)}%
+            </div>`;
+        });
+    });
 }
 
-//------------------------------------------------
-// GRAFIC 30 ZILE
-//------------------------------------------------
-function load30DayChart() {
-    fetch(`https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?api_key=${API_KEY}&days=30`)
-        .then(r => r.json())
-        .then(data => {
-
-            let labels = data.feeds.map(x => x.created_at.substring(0, 10));
-            let T = data.feeds.map(x => Number(x.field1));
-
-            new Chart(document.getElementById("chart30"), {
-                type: "line",
-                data: {
-                    labels: labels,
-                    datasets: [
-                        { label: "Temperatură 30 zile", data: T, borderColor: "yellow", tension: 0.2 }
-                    ]
-                },
-                options: { scales: { x: { ticks: { color: "#fff" } }, y: { ticks: { color: "#fff" } } } }
-            });
-        });
-}
-
-//------------------------------------------------
-// PORNIRE
-//------------------------------------------------
+// -----------------------------
+// PORNIRE REFRESH AUTOMAT
+// -----------------------------
 updateCards();
-loadLiveChart();
-load7DayChart();
-load30DayChart();
+drawTempChart();
+drawHumChart();
+loadDailyStats();
 
-// Refresh valori la 15 secunde
-setInterval(updateCards, 15000);
-//------------------------------------------------
-// REFRESH AUTOMAT GRAFICE
-//------------------------------------------------
+// carduri & mini-grafice la 15s
+setInterval(updateCards,15000);
 
-// Refresh grafic LIVE la fiecare 15 secunde
-setInterval(() => {
-    // Ștergem graficul vechi
-    document.getElementById("chartLive").remove();
-    let canvas = document.createElement("canvas");
-    canvas.id = "chartLive";
-    document.getElementById("charts-container").prepend(canvas);
+// grafice mari la 30s
+setInterval(()=>{
+    document.getElementById("tempChart").remove();
+    let c1=document.createElement("canvas"); c1.id="tempChart";
+    document.querySelector(".graph-container").prepend(c1);
 
-    loadLiveChart();
-}, 15000);
+    drawTempChart();
 
-// Refresh grafice 7 zile / 30 zile la fiecare 5 minute
-setInterval(() => {
+    document.getElementById("humChart").remove();
+    let c2=document.createElement("canvas"); c2.id="humChart";
+    document.querySelector(".graph-container").append(c2);
 
-    // 7 zile
-    document.getElementById("chart7").remove();
-    let c7 = document.createElement("canvas");
-    c7.id = "chart7";
-    document.getElementById("charts-container").append(c7);
-
-    // 30 zile
-    document.getElementById("chart30").remove();
-    let c30 = document.createElement("canvas");
-    c30.id = "chart30";
-    document.getElementById("charts-container").append(c30);
-
-    load7DayChart();
-    load30DayChart();
-
-}, 5 * 60 * 1000); // 5 minute
+    drawHumChart();
+},30000);
 
 </script>
 
