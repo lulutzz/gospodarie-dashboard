@@ -2,46 +2,76 @@
 <html lang="ro">
 <head>
 <meta charset="UTF-8">
-<title>Dashboard Gospodărie</title>
+<title>Dashboard Gospodărie – PRO</title>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
 <style>
     body {
-        background: #121212;
+        background: #111;
         color: #fff;
         font-family: Arial;
-        margin: 0;
         padding: 20px;
     }
+
     .title {
         text-align: center;
         font-size: 28px;
+        margin-bottom: 25px;
         font-weight: bold;
-        margin-bottom: 20px;
+        color: #ffcc66;
     }
-    .container {
+
+    .cards {
         display: flex;
         justify-content: center;
         gap: 20px;
         flex-wrap: wrap;
+        margin-bottom: 40px;
     }
+
     .card {
-        background: #1f1f1f;
+        background: #1a1a1a;
         padding: 20px;
         border-radius: 12px;
         width: 260px;
         text-align: center;
-        box-shadow: 0 2px 10px #000;
+        transition: 0.3s ease;
+        box-shadow: 0 0 20px #000;
     }
+
     .label {
-        font-size: 20px;
+        font-size: 18px;
         opacity: 0.7;
     }
+
     .value {
-        font-size: 44px;
-        margin-top: 10px;
+        font-size: 46px;
         font-weight: bold;
+        margin-top: 10px;
     }
+
+    /* Animație puls */
+    .pulse {
+        animation: pulseAnim 0.5s ease-in-out;
+    }
+
+    @keyframes pulseAnim {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.06); }
+        100% { transform: scale(1); }
+    }
+
+    /* ALERTA */
+    .alert {
+        border: 2px solid red;
+        box-shadow: 0 0 10px red;
+    }
+
+    #charts-container {
+        max-width: 1000px;
+        margin: auto;
+    }
+
     canvas {
         margin-top: 40px;
     }
@@ -50,82 +80,162 @@
 
 <body>
 
-<div class="title">🌡️ Dashboard Gospodărie – Temperatură & Umezeală</div>
+<div class="title">🌡️ Dashboard Gospodărie – Temperatură & Umezeală (PRO)</div>
 
-<div class="container">
-    <div class="card">
+<div class="cards">
+    <div class="card" id="tempCard">
         <div class="label">Temperatură</div>
         <div class="value" id="tempValue">-- °C</div>
     </div>
 
-    <div class="card">
+    <div class="card" id="humCard">
         <div class="label">Umezeală</div>
         <div class="value" id="humValue">-- %</div>
     </div>
 </div>
 
-<canvas id="chart" width="400" height="200"></canvas>
+<div id="charts-container">
+    <canvas id="chartLive"></canvas>
+    <canvas id="chart7"></canvas>
+    <canvas id="chart30"></canvas>
+</div>
 
 <script>
-const CHANNEL_ID = 1613849;   // ←–––––––––––– pune ID-ul canalului tău
-const API_KEY = "ZPT57WZJNMLGM2X1"; // ←–––––––––––– pune READ API KEY
+const CHANNEL_ID = 1613849;  // ← pune ID-ul tău
+const API_KEY = "ZPT57WZJNMLGM2X1"; // ← pune READ API KEY
 
-function updateValues() {
+//------------------------------------------------
+// UPDATE VALORI LIVE + ANIMAȚIE + ALERTE
+//------------------------------------------------
+function updateCards() {
     fetch(`https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?api_key=${API_KEY}&results=1`)
         .then(r => r.json())
         .then(data => {
+
             let feed = data.feeds[0];
-            document.getElementById("tempValue").innerHTML = feed.field1 + "°C";
-            document.getElementById("humValue").innerHTML = feed.field2 + "%";
+            let temp = Number(feed.field1);
+            let hum  = Number(feed.field2);
+
+            let tempCard = document.getElementById("tempCard");
+            let humCard  = document.getElementById("humCard");
+
+            // Actualizare valori
+            document.getElementById("tempValue").innerHTML = temp + "°C";
+            document.getElementById("humValue").innerHTML  = hum + "%";
+
+            // Animație puls
+            tempCard.classList.add("pulse");
+            humCard.classList.add("pulse");
+            setTimeout(() => {
+                tempCard.classList.remove("pulse");
+                humCard.classList.remove("pulse");
+            }, 400);
+
+            //----------------------
+            // SISTEM ALERTĂ
+            //----------------------
+
+            // ALERTĂ TEMPERATURĂ
+            if (temp >= 35) {
+                tempCard.classList.add("alert");
+            } else {
+                tempCard.classList.remove("alert");
+            }
+
+            // ALERTĂ UMIDITATE
+            if (hum <= 30) {
+                humCard.classList.add("alert");
+            } else {
+                humCard.classList.remove("alert");
+            }
         });
 }
 
-function loadChart() {
+//------------------------------------------------
+// GRAFIC LIVE (ultimele 50 valori)
+//------------------------------------------------
+function loadLiveChart() {
     fetch(`https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?api_key=${API_KEY}&results=50`)
         .then(r => r.json())
         .then(data => {
-            let labels = data.feeds.map(x => x.created_at.substring(11, 19));
-            let temp = data.feeds.map(x => Number(x.field1));
-            let hum  = data.feeds.map(x => Number(x.field2));
 
-            let ctx = document.getElementById("chart").getContext("2d");
-            new Chart(ctx, {
+            let labels = data.feeds.map(x => x.created_at.substring(11, 19));
+            let T = data.feeds.map(x => Number(x.field1));
+            let H = data.feeds.map(x => Number(x.field2));
+
+            new Chart(document.getElementById("chartLive"), {
                 type: "line",
                 data: {
                     labels: labels,
                     datasets: [
-                        {
-                            label: "Temperatura (°C)",
-                            data: temp,
-                            borderColor: "red",
-                            tension: 0.3
-                        },
-                        {
-                            label: "Umezeala (%)",
-                            data: hum,
-                            borderColor: "cyan",
-                            tension: 0.3
-                        }
+                        { label: "Temperatură (°C)", data: T, borderColor: "red", tension: 0.3 },
+                        { label: "Umezeală (%)", data: H, borderColor: "cyan", tension: 0.3 }
                     ]
                 },
-                options: {
-                    plugins: {
-                        legend: { labels: { color: "#fff" } }
-                    },
-                    scales: {
-                        x: { ticks: { color: "#fff" } },
-                        y: { ticks: { color: "#fff" } }
-                    }
-                }
+                options: { scales: { x: { ticks: { color: "#fff" } }, y: { ticks: { color: "#fff" } } } }
             });
         });
 }
 
-updateValues();
-loadChart();
+//------------------------------------------------
+// GRAFIC 7 ZILE
+//------------------------------------------------
+function load7DayChart() {
+    fetch(`https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?api_key=${API_KEY}&days=7`)
+        .then(r => r.json())
+        .then(data => {
 
-// Actualizare valori la fiecare 15 secunde
-setInterval(updateValues, 15000);
+            let labels = data.feeds.map(x => x.created_at.substring(0, 10));
+            let T = data.feeds.map(x => Number(x.field1));
+
+            new Chart(document.getElementById("chart7"), {
+                type: "line",
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: "Temperatură 7 zile", data: T, borderColor: "orange", tension: 0.2 }
+                    ]
+                },
+                options: { scales: { x: { ticks: { color: "#fff" } }, y: { ticks: { color: "#fff" } } } }
+            });
+        });
+}
+
+//------------------------------------------------
+// GRAFIC 30 ZILE
+//------------------------------------------------
+function load30DayChart() {
+    fetch(`https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?api_key=${API_KEY}&days=30`)
+        .then(r => r.json())
+        .then(data => {
+
+            let labels = data.feeds.map(x => x.created_at.substring(0, 10));
+            let T = data.feeds.map(x => Number(x.field1));
+
+            new Chart(document.getElementById("chart30"), {
+                type: "line",
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: "Temperatură 30 zile", data: T, borderColor: "yellow", tension: 0.2 }
+                    ]
+                },
+                options: { scales: { x: { ticks: { color: "#fff" } }, y: { ticks: { color: "#fff" } } } }
+            });
+        });
+}
+
+//------------------------------------------------
+// PORNIRE
+//------------------------------------------------
+updateCards();
+loadLiveChart();
+load7DayChart();
+load30DayChart();
+
+// Refresh valori la 15 secunde
+setInterval(updateCards, 15000);
+
 </script>
 
 </body>
