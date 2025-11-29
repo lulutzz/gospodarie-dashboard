@@ -29,11 +29,11 @@ DATA_BASE_URL_DEFAULT = "https://api.thingspeak.com/update"
 DEVICE_INFO = {
     "EC62609C8900": {
         "name": "Camara",        # ASCII-safe
-        "config_channel": 1613849,
+        "config_channel": 1622205,
         "data_api_key": "ZPT57WZJNMLGM2X1"
     },
 
-    "MAC_PENTRU_BAIE": {
+    "7821849F8900": {
         "name": "Baie",
         "config_channel": 3186869,
         "data_api_key": "API_KEY_PENTRU_BAIE"
