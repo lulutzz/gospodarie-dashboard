@@ -54,7 +54,7 @@ from machine import Pin, deepsleep, WDT
 #   1. CONFIG STATIC – WiFi, Telegram, Device mapping
 # ============================================================
 
-# --- WiFi ---
+# --- WiFi (aceleași ca în main.py) ---
 SSID = "DIGI-Y4bX"
 PASSWORD = "Burlusi166?"
 
@@ -63,9 +63,6 @@ BOT_TOKEN = "8532839048:AAEznUxSlaUMeNBmxZ0aFT_8vCHnlNqJ4dI"
 CHAT_ID   = "1705327493"
 
 # --- ThingSpeak: CANAL DATE (temperature + humidity) ---
-# Momentan folosim același canal de date pentru CĂMARĂ.
-# Pentru alte camere se poate extinde structura DEVICE_INFO
-# cu câmpuri dedicate pentru API key și URL.
 DATA_BASE_URL_DEFAULT = "https://api.thingspeak.com/update"
 
 # ================================
@@ -78,21 +75,21 @@ DATA_BASE_URL_DEFAULT = "https://api.thingspeak.com/update"
 #   data_api_key   = WRITE API KEY pentru canalul de DATE
 #
 DEVICE_INFO = {
-    # CĂMARĂ (Camera rece)
+    # CĂMARĂ (Camera rece) – COMPLET FUNCȚIONALĂ
     "EC62609C8900": {
         "name": "Cămară",
         "config_channel": 1622205,
         "data_api_key": "XP7PSBXSVN3CXWKQ"
     },
 
-    # BAIE – completăm MAC-ul când senzorul va fi instalat
+    # BAIE – COMPLETĂM MAC + API KEY când senzorul va fi instalat
     "MAC_PENTRU_BAIE": {
         "name": "Baie",
         "config_channel": 3186869,
         "data_api_key": "API_KEY_PENTRU_BAIE"
     },
 
-    # BUCĂTĂRIE – completăm MAC-ul când senzorul va fi instalat
+    # BUCĂTĂRIE – COMPLETĂM MAC + API KEY când senzorul va fi instalat
     "MAC_PENTRU_BUCATARIE": {
         "name": "Bucătărie",
         "config_channel": 1638468,
@@ -114,8 +111,8 @@ sensor = dht.DHT11(Pin(4))
 
 boot_btn = Pin(0, Pin.IN, Pin.PULL_UP)
 if boot_btn.value() == 0:
-    print("=== SAFE MODE ===")
-    print("Nu rulez remote.py. Poți programa placa din Thonny.")
+    print("=== SAFE MODE (remote.py) ===")
+    print("Nu rulez logica de măsurare. Poți programa placa din Thonny.")
     while True:
         time.sleep(1)
 
@@ -150,7 +147,7 @@ def connect_wifi():
     wlan.active(True)
 
     if not wlan.isconnected():
-        print("Conectare WiFi...")
+        print("Conectare WiFi (remote.py)...")
         wlan.connect(SSID, PASSWORD)
 
         timeout = time.time() + 20
@@ -158,11 +155,11 @@ def connect_wifi():
             wdt.feed()
             time.sleep(0.3)
             if time.time() > timeout:
-                print("WiFi FAIL → reset soft")
+                print("WiFi FAIL în remote.py → reset soft")
                 import machine
                 machine.reset()
 
-    print("Conectat la WiFi:", wlan.ifconfig())
+    print("Conectat la WiFi (remote.py):", wlan.ifconfig())
 
 
 def fetch_config(config_channel_id):
@@ -174,6 +171,9 @@ def fetch_config(config_channel_id):
       field4 = sampling_count
       field5 = DEBUGGING (1=debug, 0=producție)
 
+    NOTĂ:
+      - Canalul CONFIG trebuie să fie PUBLIC
+        (sau se adaptează URL-ul pentru a folosi READ API KEY).
     Dacă ceva nu merge → folosește valori implicite.
     """
     cfg = {
@@ -197,7 +197,7 @@ def fetch_config(config_channel_id):
         data = r.json()
         r.close()
 
-        # ATENȚIE: aici era bug înainte (feeds = [])
+        # ATENȚIE: aici înainte era bug (feeds = []); acum e corect.
         feeds = data.get("feeds", [])
         if not feeds:
             print("CONFIG gol → folosesc DEFAULT:", cfg)
