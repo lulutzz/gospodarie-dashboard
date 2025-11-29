@@ -36,7 +36,7 @@ DEVICE_INFO = {
     "7821849F8900": {
         "name": "Baie",
         "config_channel": 3186869,
-        "data_api_key": "API_KEY_PENTRU_BAIE"
+        "data_api_key": "ZPT57WZJNMLGM2X1"
     },
 
     "MAC_PENTRU_BUCATARIE": {
