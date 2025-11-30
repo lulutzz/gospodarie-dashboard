@@ -40,7 +40,7 @@ TELEGRAM_CHAT_ID   = "1705327493"
 DEVICE_INFO = {
     "EC62609C8900": { "name": "Camara" },
     "XXXXXXXXXXXX": { "name": "Baie" },          # <-- completezi când ai device ID
-    "YYYYYYYYYYYY": { "name": "Bucatarie" }      # <-- completezi când ai device ID
+    "7821849F8900": { "name": "Bucatarie" }      # <-- completezi când ai device ID
 }
 
 
