@@ -114,22 +114,12 @@ def connect_wifi():
 # ============================================================
 
 def fetch_config():
-    """
-    CONFIG:
-      field1 = sleep_minutes
-      field2 = camara_alarm_temp
-      field3 = camara_alarm_hum
-      field4 = baie_alarm_temp
-      field5 = baie_alarm_hum
-      field6 = buc_alarm_temp
-      field7 = buc_alarm_hum
-      field8 = DEBUGGING
-    """
+
     url = "https://api.thingspeak.com/channels/{}/feeds.json?results=1".format(
         CONFIG_CHANNEL
     )
 
-    print("Citire CONFIG:", url)
+    print("Citire CONFIG din:", url)
 
     try:
         r = urequests.get(url)
@@ -138,14 +128,12 @@ def fetch_config():
 
         feeds = js.get("feeds", [])
         if not feeds:
-            raise ValueError("empty feed")
+            raise ValueError("CONFIG gol")
 
         last = feeds[-1]
 
-        cfg = {}
-
-        def val(name, default):
-            v = last.get(name)
+        def read_int(field, default):
+            v = last.get(field)
             if v is None or v == "":
                 return default
             try:
@@ -153,22 +141,23 @@ def fetch_config():
             except:
                 return default
 
-        # valori globale
-        cfg["sleep_minutes"] = val("field1", 30)
-        cfg["DEBUGGING"]     = val("field8", 1)
+        # ---------- valori globale ----------
+        cfg = {}
+        cfg["sleep_minutes"] = read_int("field1", 30)
+        cfg["DEBUGGING"]     = read_int("field8", 1)
 
-        # valori pe cameră
+        # ---------- pe cameră ----------
         if ROOM == "Camara":
-            cfg["alarm_temp"] = val("field2", 25)
-            cfg["alarm_hum"]  = val("field3", 60)
+            cfg["alarm_temp"] = read_int("field2", 25)
+            cfg["alarm_hum"]  = read_int("field3", 60)
 
         elif ROOM == "Baie":
-            cfg["alarm_temp"] = val("field4", 28)
-            cfg["alarm_hum"]  = val("field5", 75)
+            cfg["alarm_temp"] = read_int("field4", 28)
+            cfg["alarm_hum"]  = read_int("field5", 75)
 
         elif ROOM == "Bucatarie":
-            cfg["alarm_temp"] = val("field6", 27)
-            cfg["alarm_hum"]  = val("field7", 70)
+            cfg["alarm_temp"] = read_int("field6", 27)
+            cfg["alarm_hum"]  = read_int("field7", 70)
 
         print("SETARI:", cfg)
         return cfg
@@ -177,11 +166,10 @@ def fetch_config():
         print("Eroare CONFIG:", e)
         return {
             "sleep_minutes": 30,
+            "DEBUGGING": 1,
             "alarm_temp": 25,
-            "alarm_hum": 60,
-            "DEBUGGING": 1
+            "alarm_hum": 60
         }
-
 
 # ============================================================
 # 7. Trimitere date în DATA – Gospodarie
