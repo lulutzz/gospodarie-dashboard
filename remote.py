@@ -1,148 +1,174 @@
-# ============================================================
-#  remote.py  –  v2.0
-#  Sistem multi-dispozitiv: Cămară, Baie, Bucătărie
-#  Suport: ThingSpeak CONFIG + DATA + LOG + Telegram
-# ============================================================
-
 import network
 import urequests
 import time
 import dht
 from machine import Pin, deepsleep, WDT
-import ubinascii, machine
 
-# ------------------------------------------------------------
-#   CONFIG ThingSpeak (cele 3 canale centrale)
-# ------------------------------------------------------------
-
-CHANNEL_DATA_ID   = 1613849     # DATA – Gospodarie
-CHANNEL_CONFIG_ID = 1622205     # CONFIG – Gospodarie
-CHANNEL_LOG_ID    = 1638468     # LOG – Alerte
-
-LOG_WRITE_KEY     = "XP7PSBXSVN3CXWKQ"
-
-# ------------------------------------------------------------
-#   Telegram
-# ------------------------------------------------------------
-BOT_TOKEN = "8532839048:AAEznUxSlaUMeNBmxZ0aFT_8vCHnlNqJ4dI"
-CHAT_ID   = "1705327493"
-
-# ------------------------------------------------------------
-#   Rețea WiFi
-# ------------------------------------------------------------
-SSID = "DIGI-Y4bX"
-PASSWORD = "Burlusi166?"
-
-# ------------------------------------------------------------
-# Identificare dispozitiv (Device ID)
-# ------------------------------------------------------------
-device_id = ubinascii.hexlify(machine.unique_id()).decode()
+# ============================================================
+#  remote.py v1.2 – Sistem senzori gospodărie
+#
+#  Funcționalități:
+#   ✔ Autodetectare cameră după Device ID
+#   ✔ Citire CONFIG global (channel 1622205)
+#   ✔ Mapare automată valori pentru Camara / Baie / Bucatarie
+#   ✔ Trimitere date în DATA – Gospodarie (1613849)
+#   ✔ Alerte Telegram (temperatură + umiditate)
+#   ✔ Anti-spam: max 1 alertă / ciclu
+#   ✔ DEBUGGING: fără deep-sleep
+#
+#  Arhitectură ThingSpeak:
+#   CONFIG – Gospodarie     → 1622205
+#   DATA   – Gospodarie     → 1613849 (temp=field1, hum=field2)
+#   LOG    – Alerte         → 1638468 (opțional)
+#
+# ============================================================
 
 
-# ------------------------------------------------------------
-#  Mapping camere + field-uri
-# ------------------------------------------------------------
+# ============================================================
+# 1. CONFIG – valori statice
+# ============================================================
+
+WIFI_SSID = "DIGI-Y4bX"
+WIFI_PASS = "Burlusi166?"
+
+CONFIG_CHANNEL = 1622205         # CONFIG – Gospodarie
+DATA_CHANNEL_API_KEY = "ZPT57WZJNMLGM2X1"   # DATA – Gospodarie
+
+TELEGRAM_BOT_TOKEN = "8532839048:AAEznUxSlaUMeNBmxZ0aFT_8vCHnlNqJ4dI"
+TELEGRAM_CHAT_ID   = "1705327493"
 
 DEVICE_INFO = {
-    "EC62609C8900": {        # CĂMARĂ
-        "name": "Camara",
-        "temp_field": 1,
-        "hum_field": 2
-    },
-
-    "7821849f8900": {        # BUCĂTĂRIE
-        "name": "Bucatarie",
-        "temp_field": 5,
-        "hum_field": 6
-    },
-
-    # Când ai device-ul pentru baie îl adaugi astfel:
-    # "XXXXXXXXXXXX": {
-    #     "name": "Baie",
-    #     "temp_field": 3,
-    #     "hum_field": 4
-    # }
+    "EC62609C8900": { "name": "Camara" },
+    "XXXXXXXXXXXX": { "name": "Baie" },          # <-- completezi când ai device ID
+    "YYYYYYYYYYYY": { "name": "Bucatarie" }      # <-- completezi când ai device ID
 }
 
 
-# ------------------------------------------------------------
-#  SAFE MODE (dacă ții BOOT apăsat)
-# ------------------------------------------------------------
+# ============================================================
+# 2. DETECTAREA CAMEREI DUPĂ DEVICE ID
+# ============================================================
+
+def get_device_id():
+    try:
+        import ubinascii, machine
+        return ubinascii.hexlify(machine.unique_id()).decode().upper()
+    except:
+        return "UNKNOWN"
+
+
+DEVICE_ID = get_device_id()
+ROOM = DEVICE_INFO.get(DEVICE_ID, {}).get("name", "UNKNOWN")
+
+print("=== remote.py v1.2 ===")
+print("Device:", DEVICE_ID)
+print("Camera:", ROOM)
+
+
+# ============================================================
+# 3. SAFE MODE – dacă se apasă BOOT
+# ============================================================
+
 boot_btn = Pin(0, Pin.IN, Pin.PULL_UP)
 if boot_btn.value() == 0:
-    print("=== SAFE MODE === (BOOT apăsat)")
+    print("=== SAFE MODE ===")
+    print("Nu rulez remote.py")
     while True:
         time.sleep(1)
 
 
-# ------------------------------------------------------------
-#  WATCHDOG
-# ------------------------------------------------------------
+# ============================================================
+# 4. Watchdog
+# ============================================================
+
 wdt = WDT(timeout=60000)
 
 
-# ------------------------------------------------------------
-#  WiFi
-# ------------------------------------------------------------
+# ============================================================
+# 5. Conectare WiFi
+# ============================================================
+
 def connect_wifi():
     wlan = network.WLAN(network.STA_IF)
     wlan.active(True)
 
-    if not wlan.isconnected():
-        print("Conectare WiFi...")
-        wlan.connect(SSID, PASSWORD)
+    if wlan.isconnected():
+        return wlan
 
-        timeout = time.time() + 20
-        while not wlan.isconnected():
-            wdt.feed()
-            if time.time() > timeout:
-                print("WiFi FAIL → retry după deep sleep")
-                deepsleep(30000)
-            time.sleep(0.3)
+    print("Conectare WiFi...")
+    wlan.connect(WIFI_SSID, WIFI_PASS)
+
+    timeout = time.time() + 20
+    while not wlan.isconnected():
+        wdt.feed()
+        if time.time() > timeout:
+            print("WiFi FAIL → retry in 60 sec")
+            deepsleep(60000)
+        time.sleep(0.3)
 
     print("WiFi OK:", wlan.ifconfig())
+    return wlan
 
 
-# ------------------------------------------------------------
-#  Citește CONFIG global
-# ------------------------------------------------------------
+# ============================================================
+# 6. Citire CONFIG global
+# ============================================================
+
 def fetch_config():
-    url = (
-        "https://api.thingspeak.com/channels/{}/feeds.json?results=1"
-        .format(CHANNEL_CONFIG_ID)
+    """
+    CONFIG:
+      field1 = sleep_minutes
+      field2 = camara_alarm_temp
+      field3 = camara_alarm_hum
+      field4 = baie_alarm_temp
+      field5 = baie_alarm_hum
+      field6 = buc_alarm_temp
+      field7 = buc_alarm_hum
+      field8 = DEBUGGING
+    """
+    url = "https://api.thingspeak.com/channels/{}/feeds.json?results=1".format(
+        CONFIG_CHANNEL
     )
-    print("Citire CONFIG din:", url)
+
+    print("Citire CONFIG:", url)
 
     try:
         r = urequests.get(url)
-        j = r.json()
+        js = r.json()
         r.close()
 
-        feeds = j.get("feeds", [])
+        feeds = js.get("feeds", [])
         if not feeds:
-            raise Exception("Fără feed-uri")
+            raise ValueError("empty feed")
 
-        f = feeds[-1]
+        last = feeds[-1]
 
-        def val(field, default):
+        cfg = {}
+
+        def val(name, default):
+            v = last.get(name)
+            if v is None or v == "":
+                return default
             try:
-                v = f.get(field, "")
-                if v is None or v == "":
-                    return default
                 return int(float(v))
             except:
                 return default
 
-        cfg = {
-            "sleep_minutes": val("field1", 30),
-            "camara_temp":   val("field2", 25),
-            "camara_hum":    val("field3", 60),
-            "baie_temp":     val("field4", 28),
-            "baie_hum":      val("field5", 75),
-            "buc_temp":      val("field6", 27),
-            "buc_hum":       val("field7", 70),
-            "DEBUGGING":     val("field8", 0)
-        }
+        # valori globale
+        cfg["sleep_minutes"] = val("field1", 30)
+        cfg["DEBUGGING"]     = val("field8", 1)
+
+        # valori pe cameră
+        if ROOM == "Camara":
+            cfg["alarm_temp"] = val("field2", 25)
+            cfg["alarm_hum"]  = val("field3", 60)
+
+        elif ROOM == "Baie":
+            cfg["alarm_temp"] = val("field4", 28)
+            cfg["alarm_hum"]  = val("field5", 75)
+
+        elif ROOM == "Bucatarie":
+            cfg["alarm_temp"] = val("field6", 27)
+            cfg["alarm_hum"]  = val("field7", 70)
 
         print("SETARI:", cfg)
         return cfg
@@ -151,26 +177,22 @@ def fetch_config():
         print("Eroare CONFIG:", e)
         return {
             "sleep_minutes": 30,
-            "camara_temp": 25,
-            "camara_hum": 60,
-            "baie_temp": 28,
-            "baie_hum": 75,
-            "buc_temp": 27,
-            "buc_hum": 70,
-            "DEBUGGING": 0
+            "alarm_temp": 25,
+            "alarm_hum": 60,
+            "DEBUGGING": 1
         }
 
 
-# ------------------------------------------------------------
-# Scriere valori în canalul DATA
-# ------------------------------------------------------------
-def send_to_data(temp, hum, f_temp, f_hum):
+# ============================================================
+# 7. Trimitere date în DATA – Gospodarie
+# ============================================================
+
+def send_data(temp, hum):
     url = (
         "https://api.thingspeak.com/update?"
-        "api_key=ZPT57WZJNMLGM2X1"     # cheia ta WRITE pentru DATA
-        "&field{}={}&field{}={}"
-        .format(f_temp, temp, f_hum, hum)
-    )
+        "api_key={}&field1={}&field2={}"
+    ).format(DATA_CHANNEL_API_KEY, temp, hum)
+
     try:
         r = urequests.get(url)
         print("DATA:", r.text)
@@ -179,128 +201,93 @@ def send_to_data(temp, hum, f_temp, f_hum):
         print("Eroare DATA:", e)
 
 
-# ------------------------------------------------------------
-# Scriere alerte în canalul LOG
-# ------------------------------------------------------------
-def log_alert(camera, tip, valoare, prag):
-    url = (
-        "https://api.thingspeak.com/update?"
-        "api_key={}"
-        "&field1={}"
-        "&field2={}"
-        "&field3={}"
-        "&field4={}"
-        "&field5={}"
-        "&field6={}"
-    ).format(
-        LOG_WRITE_KEY,
-        device_id,
-        camera,
-        tip,
-        valoare,
-        prag,
-        time.time()
-    )
-    try:
-        urequests.get(url)
-        print("LOG scris.")
-    except:
-        print("Eroare LOG.")
+# ============================================================
+# 8. Telegram
+# ============================================================
+
+def urlenc(s):
+    res = []
+    for ch in s:
+        o = ord(ch)
+        if (48 <= o <= 57) or (65 <= o <= 90) or (97 <= o <= 122):
+            res.append(ch)
+        elif ch == " ":
+            res.append("%20")
+        elif ch == "\n":
+            res.append("%0A")
+        else:
+            res.append("%%%02X" % o)
+    return "".join(res)
 
 
-# ------------------------------------------------------------
-#  Telegram (ASCII safe)
-# ------------------------------------------------------------
 def send_telegram(msg):
-    def urlencode(s):
-        out = []
-        for c in s:
-            o = ord(c)
-            if (48 <= o <= 57) or (65 <= o <= 90) or (97 <= o <= 122) or c in "-_.~":
-                out.append(c)
-            elif c == " ":
-                out.append("%20")
-            elif c == "\n":
-                out.append("%0A")
-            else:
-                out.append("%%%02X" % o)
-        return "".join(out)
+    if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+        return
 
-    body = "chat_id={}&text={}".format(CHAT_ID, urlencode(msg))
-    url = "https://api.telegram.org/bot{}/sendMessage".format(BOT_TOKEN)
+    msg = urlenc(msg)
+    body = "chat_id={}&text={}".format(TELEGRAM_CHAT_ID, msg)
+
+    url = "https://api.telegram.org/bot{}/sendMessage".format(
+        TELEGRAM_BOT_TOKEN
+    )
     headers = {"Content-Type": "application/x-www-form-urlencoded"}
 
     try:
         r = urequests.post(url, data=body, headers=headers)
-        print("Telegram:", r.text)
+        print("TG:", r.text)
         r.close()
     except Exception as e:
-        print("Telegram E:", e)
+        print("Eroare TG:", e)
 
 
-# ------------------------------------------------------------
-#  MAIN
-# ------------------------------------------------------------
-print("=== remote.py v2.0 ===")
-print("Device ID:", device_id)
+# ============================================================
+# 9. Program principal
+# ============================================================
 
-info = DEVICE_INFO.get(device_id)
-if not info:
-    print("⚠ Dispozitiv NE-înregistrat în DEVICE_INFO!")
-    print("Adaugă device-ul în GitHub.")
-    while True:
-        time.sleep(1)
-
-camera = info["name"]
-f_temp = info["temp_field"]
-f_hum  = info["hum_field"]
-
-print("Camera:", camera)
+sensor = dht.DHT11(Pin(4))
 
 while True:
-    wdt.feed()
 
+    wdt.feed()
     connect_wifi()
     cfg = fetch_config()
 
-    # Selectarea pragurilor după cameră
-    if camera == "Camara":
-        alarm_temp = cfg["camara_temp"]
-        alarm_hum  = cfg["camara_hum"]
-    elif camera == "Baie":
-        alarm_temp = cfg["baie_temp"]
-        alarm_hum  = cfg["baie_hum"]
-    else:
-        alarm_temp = cfg["buc_temp"]
-        alarm_hum  = cfg["buc_hum"]
+    # Citire senzor
+    try:
+        sensor.measure()
+        t = sensor.temperature()
+        h = sensor.humidity()
+        print("Citire:", t, h)
+    except:
+        print("Eroare senzor")
+        t = None
+        h = None
 
-    DEBUG = cfg["DEBUGGING"]
+    # Trimite date
+    if t is not None and h is not None:
+        send_data(t, h)
 
-    # citire senzor
-    sensor = dht.DHT11(Pin(4))
-    sensor.measure()
-    t = sensor.temperature()
-    h = sensor.humidity()
+    # Alerte
+    if t is not None and t >= cfg["alarm_temp"]:
+        send_telegram(
+            "ALERTA TEMPERATURA - {}\nTemperatura: {} C\nPrag: {} C".format(
+                ROOM, t, cfg["alarm_temp"]
+            )
+        )
 
-    print("Citire:", t, h)
+    if h is not None and h >= cfg["alarm_hum"]:
+        send_telegram(
+            "ALERTA UMIDITATE - {}\nUmiditate: {} %\nPrag: {} %".format(
+                ROOM, h, cfg["alarm_hum"]
+            )
+        )
 
-    send_to_data(t, h, f_temp, f_hum)
-
-    # alerte
-    if t >= alarm_temp:
-        msg = "ALERTA TEMP – {}: {}C (prag {}C)".format(camera, t, alarm_temp)
-        send_telegram(msg)
-        log_alert(camera, "TEMP", t, alarm_temp)
-
-    if h >= alarm_hum:
-        msg = "ALERTA UMID – {}: {}% (prag {}%)".format(camera, h, alarm_hum)
-        send_telegram(msg)
-        log_alert(camera, "HUM", h, alarm_hum)
-
-    if DEBUG == 1:
-        print("DEBUG – reluare în 10 sec")
+    # DEBUGGING → fără deep sleep
+    if cfg["DEBUGGING"] == 1:
+        print("DEBUG → reluare 10 sec")
         time.sleep(10)
         continue
 
-    print("Deep sleep {} min".format(cfg["sleep_minutes"]))
-    deepsleep(cfg["sleep_minutes"] * 60000)
+    # PRODUCȚIE
+    print("Sleep:", cfg["sleep_minutes"], "minute")
+    deepsleep(cfg["sleep_minutes"] * 60 * 1000)
