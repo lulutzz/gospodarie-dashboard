@@ -188,43 +188,42 @@
 const API_KEY = "L7AUPY13P0E0KJV9";
 const BASE_URL = "https://api.thingspeak.com/update";
 
-function sendConfig(fields, statusId) {
+async function sendConfig(fields, statusId) {
     const statusEl = document.getElementById(statusId);
     statusEl.textContent = "Trimit configurarea...";
     statusEl.className = "status";
 
-    const params = new URLSearchParams();
-    params.append("api_key", API_KEY);
+    let payload = "api_key=" + API_KEY;
 
-    let hasField = false;
-
-    Object.entries(fields).forEach(([field, value]) => {
-        if (value !== "" && value != null && !Number.isNaN(value)) {
-            params.append(field, value);
-            hasField = true;
+    Object.entries(fields).forEach(([f, v]) => {
+        if (v !== "" && v != null && !Number.isNaN(v)) {
+            payload += `&${f}=${encodeURIComponent(v)}`;
         }
     });
 
-    if (!hasField) {
-        statusEl.textContent = "Nimic de trimis – verifică valorile.";
+    try {
+        const response = await fetch(BASE_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: payload
+        });
+
+        const text = await response.text();
+
+        if (parseInt(text) > 0) {
+            statusEl.textContent = "✔ Config trimisă (entry " + text + ")";
+            statusEl.className = "status ok";
+        } else {
+            statusEl.textContent = "❌ Eroare ThingSpeak (" + text + ")";
+            statusEl.className = "status err";
+        }
+
+    } catch (err) {
+        statusEl.textContent = "❌ Eroare: " + err;
         statusEl.className = "status err";
-        return;
     }
-
-    const url = `${BASE_URL}?${params.toString()}`;
-
-    // Trick simplu: folosim un <img> ca să facem request fără probleme CORS
-    const img = new Image();
-    img.onload = function () {
-        statusEl.textContent = "Comandă trimisă (verifică ThingSpeak).";
-        statusEl.className = "status ok";
-    };
-    img.onerror = function () {
-        statusEl.textContent = "Eroare la trimitere (verifică internetul).";
-        statusEl.className = "status err";
-    };
-    img.src = url + "&_ts=" + Date.now(); // cache-buster
 }
+
 </script>
 </head>
 
