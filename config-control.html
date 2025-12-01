@@ -2,75 +2,378 @@
 <html lang="ro">
 <head>
 <meta charset="UTF-8">
-<title>CONFIG – Control Senzori Gospodărie</title>
+<title>CONFIG – Senzori Gospodărie</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-    body { 
-        font-family: Arial, sans-serif; 
-        background: #f0f2f5; 
-        margin: 0; padding: 20px; 
+    :root {
+        --bg: #0f172a;
+        --card-bg: #111827;
+        --accent: #38bdf8;
+        --accent2: #22c55e;
+        --accent3: #f97316;
+        --text: #e5e7eb;
+        --muted: #9ca3af;
+        --danger: #f97373;
     }
-    h1 { text-align: center; margin-bottom: 10px; }
-    .panel {
-        background: white; padding: 20px;
-        max-width: 600px; margin: 20px auto; 
-        border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+
+    * { box-sizing: border-box; }
+
+    body {
+        margin: 0;
+        padding: 16px;
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: radial-gradient(circle at top, #1f2937 0, #020617 55%, #000 100%);
+        color: var(--text);
     }
-    h2 { margin-top: 0; }
+
+    h1 {
+        text-align: center;
+        margin: 0 0 4px;
+        font-size: 1.6rem;
+    }
+
+    .subtitle {
+        text-align: center;
+        font-size: 0.9rem;
+        color: var(--muted);
+        margin-bottom: 18px;
+    }
+
+    .grid {
+        display: grid;
+        gap: 16px;
+        max-width: 960px;
+        margin: 0 auto;
+    }
+
+    @media (min-width: 768px) {
+        .grid-2 {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .grid-3 {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+    }
+
+    .card {
+        background: linear-gradient(135deg, rgba(15,23,42,0.95), rgba(15,23,42,0.8));
+        border-radius: 14px;
+        padding: 14px 14px 12px;
+        box-shadow: 0 18px 40px rgba(0,0,0,0.5);
+        border: 1px solid rgba(148,163,184,0.15);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .card::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at top left, rgba(56,189,248,0.12), transparent 55%);
+        opacity: 0.7;
+        pointer-events: none;
+    }
+
+    .card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 8px;
+    }
+
+    .card-title {
+        font-size: 1.05rem;
+        font-weight: 600;
+    }
+
+    .tag {
+        font-size: 0.75rem;
+        padding: 3px 8px;
+        border-radius: 999px;
+        border: 1px solid rgba(148,163,184,0.4);
+        color: var(--muted);
+        backdrop-filter: blur(6px);
+    }
+
+    .tag-global { border-color: rgba(56,189,248,0.8); color: var(--accent); }
+    .tag-room   { border-color: rgba(34,197,94,0.7);  color: var(--accent2); }
+
+    .row {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 6px;
+    }
+
+    .field {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    label {
+        font-size: 0.8rem;
+        color: var(--muted);
+    }
+
+    input, select {
+        border-radius: 8px;
+        border: 1px solid rgba(148,163,184,0.35);
+        background: rgba(15,23,42,0.9);
+        color: var(--text);
+        padding: 6px 8px;
+        font-size: 0.9rem;
+        outline: none;
+    }
+
+    input:focus, select:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 1px rgba(56,189,248,0.3);
+    }
+
     button {
-        width: 100%; padding: 12px; margin: 8px 0;
-        border-radius: 8px; border: none; cursor: pointer;
-        font-size: 16px; font-weight: bold;
+        border-radius: 999px;
+        border: none;
+        padding: 8px 10px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        margin-top: 4px;
     }
-    .sleep { background: #3578e5; color: white; }
-    .debug-on { background: #ff9800; color: white; }
-    .debug-off { background: #4caf50; color: white; }
-    .camara { background: #3f51b5; color: white; }
-    .baie { background: #009688; color: white; }
-    .bucatarie { background: #9c27b0; color: white; }
+
+    .btn-primary {
+        background: linear-gradient(135deg, #0ea5e9, #22c55e);
+        color: #0b1120;
+    }
+
+    .btn-primary:hover {
+        filter: brightness(1.05);
+    }
+
+    .btn-outline {
+        background: transparent;
+        border: 1px solid rgba(148,163,184,0.5);
+        color: var(--muted);
+    }
+
+    .status {
+        margin-top: 6px;
+        font-size: 0.75rem;
+        min-height: 16px;
+        color: var(--muted);
+    }
+
+    .status.ok { color: #4ade80; }
+    .status.err { color: var(--danger); }
+
+    .footer {
+        max-width: 960px;
+        margin: 18px auto 0;
+        font-size: 0.7rem;
+        text-align: center;
+        color: var(--muted);
+    }
+
+    a {
+        color: var(--accent);
+        text-decoration: none;
+    }
 </style>
 
 <script>
 const API_KEY = "L7AUPY13P0E0KJV9";
+const BASE_URL = "https://api.thingspeak.com/update";
 
-function send(field, value) {
-    const url = `https://api.thingspeak.com/update?api_key=${API_KEY}&${field}=${value}`;
-    window.open(url, "_blank");
+function sendConfig(fields, statusId) {
+    const statusEl = document.getElementById(statusId);
+    statusEl.textContent = "Trimit configurarea...";
+    statusEl.className = "status";
+
+    const params = new URLSearchParams();
+    params.append("api_key", API_KEY);
+
+    let hasField = false;
+
+    Object.entries(fields).forEach(([field, value]) => {
+        if (value !== "" && value != null && !Number.isNaN(value)) {
+            params.append(field, value);
+            hasField = true;
+        }
+    });
+
+    if (!hasField) {
+        statusEl.textContent = "Nimic de trimis – verifică valorile.";
+        statusEl.className = "status err";
+        return;
+    }
+
+    const url = `${BASE_URL}?${params.toString()}`;
+
+    // Trick simplu: folosim un <img> ca să facem request fără probleme CORS
+    const img = new Image();
+    img.onload = function () {
+        statusEl.textContent = "Comandă trimisă (verifică ThingSpeak).";
+        statusEl.className = "status ok";
+    };
+    img.onerror = function () {
+        statusEl.textContent = "Eroare la trimitere (verifică internetul).";
+        statusEl.className = "status err";
+    };
+    img.src = url + "&_ts=" + Date.now(); // cache-buster
 }
 </script>
 </head>
 
 <body>
 
-<h1>CONFIG – Control Senzori</h1>
-
-<div class="panel">
-    <h2>⏱ Interval măsurare</h2>
-    <button class="sleep" onclick="send('field1', 1)">Sleep 1 minut (TEST)</button>
-    <button class="sleep" onclick="send('field1', 30)">Sleep 30 minute (PROD)</button>
+<h1>CONFIG – Senzori Gospodărie</h1>
+<div class="subtitle">
+    Canal: <strong>CONFIG – Gospodărie</strong> (ID: 1622205) · ThingSpeak  
 </div>
 
-<div class="panel">
-    <h2>🛠 Modul DEBUG</h2>
-    <button class="debug-on" onclick="send('field8', 1)">ACTIVARE DEBUG (fără sleep)</button>
-    <button class="debug-off" onclick="send('field8', 0)">DEZACTIVARE DEBUG</button>
+<div class="grid grid-2">
+
+    <!-- GLOBAL -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">Setări globale</div>
+            <span class="tag tag-global">Global</span>
+        </div>
+
+        <div class="row">
+            <div class="field">
+                <label for="sleep_minutes">Sleep (minute) – field1</label>
+                <input id="sleep_minutes" type="number" min="1" max="180" placeholder="ex: 30">
+            </div>
+            <div class="field">
+                <label for="debug">DEBUGGING – field8</label>
+                <select id="debug">
+                    <option value="">(nu modific)</option>
+                    <option value="1">1 – DEBUG ON (fără sleep)</option>
+                    <option value="0">0 – PROD (cu sleep)</option>
+                </select>
+            </div>
+        </div>
+
+        <button class="btn-primary" onclick="
+            const sleepVal = document.getElementById('sleep_minutes').value;
+            const debugVal = document.getElementById('debug').value;
+            const fields = {};
+            if (sleepVal !== '') fields['field1'] = Number(sleepVal);
+            if (debugVal !== '') fields['field8'] = Number(debugVal);
+            sendConfig(fields, 'status-global');
+        ">
+            💾 Salvează globale
+        </button>
+        <div id="status-global" class="status"></div>
+    </div>
+
+    <!-- CAMARA -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">Cămară (EC62609C8900)</div>
+            <span class="tag tag-room">Camara · fields 2–3</span>
+        </div>
+
+        <div class="row">
+            <div class="field">
+                <label for="camara_temp">Prag temperatură (°C) – field2</label>
+                <input id="camara_temp" type="number" step="0.1" placeholder="ex: 25">
+            </div>
+            <div class="field">
+                <label for="camara_hum">Prag umiditate (%) – field3</label>
+                <input id="camara_hum" type="number" step="1" placeholder="ex: 60">
+            </div>
+        </div>
+
+        <button class="btn-primary" onclick="
+            const t = document.getElementById('camara_temp').value;
+            const h = document.getElementById('camara_hum').value;
+            const fields = {};
+            if (t !== '') fields['field2'] = Number(t);
+            if (h !== '') fields['field3'] = Number(h);
+            sendConfig(fields, 'status-camara');
+        ">
+            💾 Salvează Cămară
+        </button>
+        <div id="status-camara" class="status"></div>
+    </div>
+
 </div>
 
-<div class="panel">
-    <h2>📦 Cămară – praguri</h2>
-    <button class="camara" onclick="send('field2', 25)">Temp 25°C</button>
-    <button class="camara" onclick="send('field3', 60)">Umiditate 60%</button>
+<div class="grid grid-2" style="margin-top:10px;">
+
+    <!-- BAIE -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">Baie</div>
+            <span class="tag tag-room">Baie · fields 4–5</span>
+        </div>
+
+        <div class="row">
+            <div class="field">
+                <label for="baie_temp">Prag temperatură (°C) – field4</label>
+                <input id="baie_temp" type="number" step="0.1" placeholder="ex: 28">
+            </div>
+            <div class="field">
+                <label for="baie_hum">Prag umiditate (%) – field5</label>
+                <input id="baie_hum" type="number" step="1" placeholder="ex: 75">
+            </div>
+        </div>
+
+        <button class="btn-primary" onclick="
+            const t = document.getElementById('baie_temp').value;
+            const h = document.getElementById('baie_hum').value;
+            const fields = {};
+            if (t !== '') fields['field4'] = Number(t);
+            if (h !== '') fields['field5'] = Number(h);
+            sendConfig(fields, 'status-baie');
+        ">
+            💾 Salvează Baie
+        </button>
+        <div id="status-baie" class="status"></div>
+    </div>
+
+    <!-- BUCATARIE -->
+    <div class="card">
+        <div class="card-header">
+            <div class="card-title">Bucătărie (7821849F8900)</div>
+            <span class="tag tag-room">Bucatarie · fields 6–7</span>
+        </div>
+
+        <div class="row">
+            <div class="field">
+                <label for="buc_temp">Prag temperatură (°C) – field6</label>
+                <input id="buc_temp" type="number" step="0.1" placeholder="ex: 27">
+            </div>
+            <div class="field">
+                <label for="buc_hum">Prag umiditate (%) – field7</label>
+                <input id="buc_hum" type="number" step="1" placeholder="ex: 70">
+            </div>
+        </div>
+
+        <button class="btn-primary" onclick="
+            const t = document.getElementById('buc_temp').value;
+            const h = document.getElementById('buc_hum').value;
+            const fields = {};
+            if (t !== '') fields['field6'] = Number(t);
+            if (h !== '') fields['field7'] = Number(h);
+            sendConfig(fields, 'status-buc');
+        ">
+            💾 Salvează Bucătărie
+        </button>
+        <div id="status-buc" class="status"></div>
+    </div>
+
 </div>
 
-<div class="panel">
-    <h2>🚿 Baie – praguri</h2>
-    <button class="baie" onclick="send('field4', 28)">Temp 28°C</button>
-    <button class="baie" onclick="send('field5', 75)">Umiditate 75%</button>
-</div>
-
-<div class="panel">
-    <h2>🍳 Bucătărie – praguri</h2>
-    <button class="bucatarie" onclick="send('field6', 27)">Temp 27°C</button>
-    <button class="bucatarie" onclick="send('field7', 70)">Umiditate 70%</button>
+<div class="footer">
+    Panoul trimite direct comenzi către ThingSpeak prin API-ul <code>update</code>.<br>
+    După salvare, valorile apar în canalul <strong>CONFIG – Gospodărie (1622205)</strong>, iar ESP32 le va citi la următorul ciclu.
 </div>
 
 </body>
