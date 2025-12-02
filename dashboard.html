@@ -1,107 +1,47 @@
 <!DOCTYPE html>
 <html lang="ro">
 <head>
-    <meta charset="UTF-8">
-    <title>ESP32 Dashboard – Comenzi cu ACK</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <script src="https://unpkg.com/paho-mqtt/mqttws31.min.js"></script>
+<meta charset="UTF-8">
+<title>Gospodărie – Dashboard ESP32</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="https://unpkg.com/paho-mqtt/mqttws31.min.js"></script>
 
-    <style>
-        body { background:#0b1f12; color:#e9f5ea; font-family:Arial; margin:0; }
-        h1 { margin:0 0 10px; }
-        .page { max-width:1000px; margin:auto; padding:20px; }
-
-        .card {
-            background:#12281a;
-            padding:15px;
-            border-radius:14px;
-            margin-bottom:12px;
-            border:1px solid #27402d;
-        }
-
-        .device-title {
-            font-size:1.2rem;
-            display:flex;
-            justify-content:space-between;
-            margin-bottom:6px;
-        }
-
-        .status-dot {
-            width:10px; height:10px; border-radius:50%;
-            background:#555;
-        }
-        .status-dot.online { background:#00e676; box-shadow:0 0 6px #00e676; }
-        .status-dot.offline { background:#ff5252; box-shadow:0 0 6px #ff5252; }
-
-        button {
-            padding:6px 12px;
-            margin-right:6px;
-            border-radius:12px;
-            border:1px solid #4caf50;
-            background:#1a3d26;
-            color:white;
-            cursor:pointer;
-        }
-        button:hover { background:#2a5d36; }
-        button.red { border-color:#ff5252; }
-        button.yellow { border-color:#ffb300; }
-
-        .log-box {
-            background:#00000060;
-            border:1px solid #27402d;
-            padding:8px;
-            margin-top:10px;
-            height:140px;
-            overflow-y:auto;
-            font-size:0.8rem;
-            white-space:pre-wrap;
-            border-radius:10px;
-        }
-
-        #mqtt-status { margin-bottom:14px; }
-    </style>
+<style>
+body { background:#08140c; color:#e6f5ea; font-family:Arial; margin:0; }
+.card { background:#12281a; padding:16px; border-radius:14px; margin-bottom:16px; }
+.btn { padding:6px 12px; border-radius:20px; cursor:pointer; border:1px solid #4caf50; margin-right:6px; }
+.btn-yellow { border-color:#ffb300; }
+.btn-red { border-color:#ff5252; }
+.log { background:#000; padding:10px; border-radius:12px; height:180px; overflow:auto; font-size:12px; }
+.status-dot { width:8px; height:8px; border-radius:50%; display:inline-block; margin-left:6px; }
+.online { background:#00e676; box-shadow:0 0 6px #00e676; }
+.offline { background:#ff5252; box-shadow:0 0 6px #ff5252; }
+</style>
 </head>
 
 <body>
-<div class="page">
 
-    <h1>ESP32 Dashboard – Control Direct</h1>
+<h2 style="padding:16px;">Dashboard ESP32 – Control Direct</h2>
 
-    <div id="mqtt-status">🔴 MQTT: deconectat</div>
+<div class="card">
+  <h3>Cămară <span id="dot-EC62609C8900" class="status-dot offline"></span></h3>
+  <button class="btn" onclick="sendCmd('EC62609C8900','ping')">Ping</button>
+  <button class="btn btn-yellow" onclick="sendCmd('EC62609C8900','run')">Run</button>
+  <button class="btn btn-red" onclick="sendCmd('EC62609C8900','reboot')">Reboot</button>
+  <div class="log" id="log-EC62609C8900"></div>
+</div>
 
-    <!-- Camara -->
-    <div class="card">
-        <div class="device-title">
-            Cămară
-            <span id="dot-EC62609C8900" class="status-dot"></span>
-        </div>
+<div class="card">
+  <h3>Bucătărie <span id="dot-7821849F8900" class="status-dot offline"></span></h3>
+  <button class="btn" onclick="sendCmd('7821849F8900','ping')">Ping</button>
+  <button class="btn btn-yellow" onclick="sendCmd('7821849F8900','run')">Run</button>
+  <button class="btn btn-red" onclick="sendCmd('7821849F8900','reboot')">Reboot</button>
+  <div class="log" id="log-7821849F8900"></div>
+</div>
 
-        <button onclick="sendCmd('EC62609C8900','ping')">Ping</button>
-        <button class="yellow" onclick="sendCmd('EC62609C8900','run')">Run</button>
-        <button class="red" onclick="sendCmd('EC62609C8900','reboot')">Reboot</button>
-
-        <div class="log-box" id="log-EC62609C8900"></div>
-    </div>
-
-    <!-- Bucatarie -->
-    <div class="card">
-        <div class="device-title">
-            Bucătărie
-            <span id="dot-7821849F8900" class="status-dot"></span>
-        </div>
-
-        <button onclick="sendCmd('7821849F8900','ping')">Ping</button>
-        <button class="yellow" onclick="sendCmd('7821849F8900','run')">Run</button>
-        <button class="red" onclick="sendCmd('7821849F8900','reboot')">Reboot</button>
-
-        <div class="log-box" id="log-7821849F8900"></div>
-    </div>
-
-    <div class="card">
-        <h3>Log MQTT</h3>
-        <div class="log-box" id="log-mqtt"></div>
-    </div>
-
+<div class="card">
+  <h3>MQTT Log</h3>
+  <div class="log" id="log-mqtt"></div>
 </div>
 
 <script>
@@ -111,90 +51,76 @@ const PATH = "/mqtt";
 const USER = "burlusi";
 const PASS = "Burlusi166?";
 const BASE = "/gosp/";
-const CMD = "/cmd/";
-const ACK = "/ack";
-const STATUS = "/status";
-const LOG = "/log";
+const DEVICES = ["EC62609C8900","7821849F8900"];
 
 let client = null;
-let clientId = "WEB_" + Math.random().toString(16).substr(2,8);
+let clientId = "WEB_" + Math.random().toString(16).substr(2,6);
 
-function log(boxId, msg) {
-    const box = document.getElementById(boxId);
-    const t = new Date().toLocaleTimeString();
-    box.textContent += `[${t}] ${msg}\n`;
-    box.scrollTop = box.scrollHeight;
+function logMQTT(msg){
+  let box=document.getElementById("log-mqtt");
+  box.innerHTML += msg+"\n";
+  box.scrollTop = box.scrollHeight;
 }
 
-function setOnline(id, online) {
-    let dot = document.getElementById("dot-" + id);
-    dot.classList.remove("online","offline");
-    dot.classList.add(online ? "online" : "offline");
+function logDev(id,msg){
+  let box=document.getElementById("log-"+id);
+  box.innerHTML += msg+"\n";
+  box.scrollTop = box.scrollHeight;
 }
 
-function connectMQTT() {
-    client = new Paho.MQTT.Client(HOST, PORT, PATH, clientId);
-    client.onConnectionLost = () => {
-        document.getElementById("mqtt-status").textContent = "🔴 MQTT: deconectat";
-        setTimeout(connectMQTT, 2000);
-    };
-
-    client.onMessageArrived = onMsg;
-
-    client.connect({
-        useSSL:true,
-        userName:USER,
-        password:PASS,
-        timeout:8,
-        keepAliveInterval:20,
-        onSuccess:() => {
-            document.getElementById("mqtt-status").textContent = "🟢 MQTT: conectat";
-
-            client.subscribe(BASE + "+/status");
-            client.subscribe(BASE + "+/log");
-            client.subscribe(BASE + "+/cmd/ack");
-        }
-    });
+function setDot(id, online){
+  let dot=document.getElementById("dot-"+id);
+  dot.classList.remove("online","offline");
+  dot.classList.add(online?"online":"offline");
 }
 
-function onMsg(msg) {
-    log("log-mqtt", msg.destinationName + " = " + msg.payloadString);
+function connectMQTT(){
+  client = new Paho.MQTT.Client(HOST, PORT, PATH, clientId);
+  client.onConnectionLost = ()=>logMQTT("Conexiune pierdută");
+  client.onMessageArrived = onMsg;
 
-    if (msg.destinationName.endsWith("/status")) {
-        let id = msg.destinationName.split("/")[2];
-        setOnline(id, true);
-    }
-
-    if (msg.destinationName.endsWith("/log")) {
-        let id = msg.destinationName.split("/")[2];
-        log("log-" + id, msg.payloadString);
-    }
-
-    if (msg.destinationName.endsWith("/ack")) {
-        let id = msg.destinationName.split("/")[2];
-        log("log-" + id, "ACK: " + msg.payloadString);
-    }
+  client.connect({
+    useSSL:true, userName:USER, password:PASS,
+    onSuccess:()=>{
+      logMQTT("Conectat MQTT");
+      DEVICES.forEach(id=>{
+        client.subscribe(BASE+id+"/log");
+        client.subscribe(BASE+id+"/status");
+        client.subscribe(BASE+id+"/cmd/ack");
+      });
+    },
+    onFailure:(e)=>logMQTT("Eroare conectare: "+e.errorMessage)
+  });
 }
 
-function sendCmd(deviceId, cmd) {
-    if (!client || !client.isConnected()) {
-        alert("MQTT nu este conectat!");
-        return;
-    }
-    let topic = BASE + deviceId + CMD + cmd;
-    let ackTopic = BASE + deviceId + CMD + "ack";
+function onMsg(m){
+  let t=m.destinationName, p=m.payloadString;
+  logMQTT(t+" = "+p);
 
-    client.subscribe(ackTopic);
-    client.send(new Paho.MQTT.Message("1").setDestinationName(topic));
-
-    log("log-" + deviceId, "Trimis CMD: " + cmd);
-
-    setTimeout(() => {
-        log("log-" + deviceId, "⚠ Timeout ACK pentru cmd " + cmd);
-    }, 4000);
+  // status
+  DEVICES.forEach(id=>{
+    if(t === BASE+id+"/status"){ setDot(id,true); logDev(id,"STATUS: "+p); }
+    if(t === BASE+id+"/log"){ setDot(id,true); logDev(id,p); }
+    if(t === BASE+id+"/cmd/ack"){ logDev(id,"ACK: "+p); }
+  });
 }
 
-connectMQTT();
+function sendCmd(id,cmd){
+  if(!client.isConnected()) return alert("MQTT nu e conectat");
+
+  let topic = BASE + id + "/cmd/" + cmd;
+  let msg = new Paho.MQTT.Message("1");
+  msg.destinationName = topic;
+
+  client.send(msg);
+  logMQTT("Trimis: "+topic);
+
+  // subscribe ACK
+  client.subscribe(BASE+id+"/cmd/ack");
+}
+
+window.onload = connectMQTT;
 </script>
+
 </body>
 </html>
