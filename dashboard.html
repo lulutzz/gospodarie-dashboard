@@ -85,9 +85,13 @@ window.addEventListener("load", function () {
   const clientId = "dashboard_" + Math.random().toString(16).substr(2, 6);
   const mqttUser = "burlusi";
   const mqttPass = "Burlusi166?";
+  // CONFIG MQTT
+  const host = "c72cc38c1f184d0199cc4daa938bac6f.s1.eu.hivemq.cloud";
+  const port = 8884;              // WebSocket TLS
+  const path = "/mqtt";           // default HiveMQ WS path
+  const clientId = "webclient_" + Math.random().toString(16).substr(2, 8);
 
-  const client = new Paho.MQTT.Client(mqttHost, mqttPort, mqttPath, clientId);
-
+  const client = new Paho.Client(host, port, path, clientId);
   client.onConnectionLost = err => console.warn("Conexiune pierdută", err);
   client.onMessageArrived = msg => {
     const topic = msg.destinationName;
