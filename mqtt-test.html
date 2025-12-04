@@ -5,12 +5,12 @@
 <title>MQTT Test</title>
 
 <!-- 🔥 Biblioteca MQTT – obligatoriu prima! -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/mqttws31.min.js"></script>
+<script src="https://unpkg.com/paho-mqtt/mqttws31.min.js"></script>
 
 </head>
 <body style="background:black;color:#0f0;font-family:monospace;padding:20px">
 <h2>MQTT Test</h2>
-<pre id="log">Loading MQTT...1</pre>
+<pre id="log">Loading MQTT...</pre>
 
 <script>
 function log(msg){
@@ -25,9 +25,10 @@ const PASS = "Burlusi166?";
 const clientId = "WEBTEST_" + Math.random().toString(16).substr(2,8);
 
 log("Connecting...");
-
-let client = new Paho.MQTT.Client(HOST, PORT, PATH, clientId);
-
+let client = new Paho.MQTT.Client(
+  "wss://c72cc38c1f184d0199cc4daa938bac6f.s1.eu.hivemq.cloud:8884/mqtt",
+  clientId
+);
 client.onConnectionLost = (r)=>{
     log("Connection lost: " + r.errorMessage);
 };
