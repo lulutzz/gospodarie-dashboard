@@ -277,5 +277,9 @@ while True:
         continue
 
     # PRODUCȚIE
-    print("Sleep:", cfg["sleep_minutes"], "minute")
-    deepsleep(cfg["sleep_minutes"] * 60 * 1000)
+
+    minutes = cfg.get("sleep_minutes", 5)
+    print("Sleep:", minutes, "minute (soft)")
+
+    for _ in range(int(minutes * 60)):
+        time.sleep(1)
