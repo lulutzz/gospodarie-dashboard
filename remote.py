@@ -38,9 +38,41 @@ TELEGRAM_BOT_TOKEN = "8532839048:AAEznUxSlaUMeNBmxZ0aFT_8vCHnlNqJ4dI"
 TELEGRAM_CHAT_ID   = "1705327493"
 
 DEVICE_INFO = {
-    "EC62609C8900": { "name": "Camara" },
-    "XXXXXXXXXXXX": { "name": "Baie" },          # <-- completezi când ai device ID
-    "7821849F8900": { "name": "Bucatarie" }      # <-- completezi când ai device ID
+    "EC62609C8900": {        # ID Camara
+        "name": "Camara",
+        "config_fields": {   # din canalul CONFIG (1622205)
+            "alarm_temp": "field2",
+            "alarm_hum":  "field3",
+        },
+        "data_fields": {     # în canalul DATA (1613849)
+            "temp": "field1",
+            "hum":  "field2",
+        },
+    },
+
+    "7821849F8900": {        # ID Bucătărie
+        "name": "Bucatarie",
+        "config_fields": {
+            "alarm_temp": "field6",
+            "alarm_hum":  "field7",
+        },
+        "data_fields": {
+            "temp": "field5",
+            "hum":  "field6",
+        },
+    },
+
+    "XXXXXXXXXXXX": {        # exemplu pentru Baie – completezi ID real
+        "name": "Baie",
+        "config_fields": {
+            "alarm_temp": "field4",
+            "alarm_hum":  "field5",
+        },
+        "data_fields": {
+            "temp": "field3",
+            "hum":  "field4",
+        },
+    },
 }
 
 
@@ -114,7 +146,6 @@ def connect_wifi():
 # ============================================================
 
 def fetch_config():
-
     url = "https://api.thingspeak.com/channels/{}/feeds.json?results=1".format(
         CONFIG_CHANNEL
     )
@@ -141,23 +172,21 @@ def fetch_config():
             except:
                 return default
 
-        # ---------- valori globale ----------
         cfg = {}
+
+        # ---------- valori globale (valabile pentru toate device-urile) ----------
         cfg["sleep_minutes"] = read_int("field1", 30)
         cfg["DEBUGGING"]     = read_int("field8", 1)
 
-        # ---------- pe cameră ----------
-        if ROOM == "Camara":
-            cfg["alarm_temp"] = read_int("field2", 25)
-            cfg["alarm_hum"]  = read_int("field3", 60)
+        # ---------- praguri specifice device-ului ----------
+        info = INFO or {}
+        cfg_fields = info.get("config_fields", {})
 
-        elif ROOM == "Baie":
-            cfg["alarm_temp"] = read_int("field4", 28)
-            cfg["alarm_hum"]  = read_int("field5", 75)
+        temp_field = cfg_fields.get("alarm_temp", "field2")  # default Camara
+        hum_field  = cfg_fields.get("alarm_hum",  "field3")
 
-        elif ROOM == "Bucatarie":
-            cfg["alarm_temp"] = read_int("field6", 27)
-            cfg["alarm_hum"]  = read_int("field7", 70)
+        cfg["alarm_temp"] = read_int(temp_field, 25)
+        cfg["alarm_hum"]  = read_int(hum_field, 60)
 
         print("SETARI:", cfg)
         return cfg
@@ -168,7 +197,7 @@ def fetch_config():
             "sleep_minutes": 30,
             "DEBUGGING": 1,
             "alarm_temp": 25,
-            "alarm_hum": 60
+            "alarm_hum": 60,
         }
 
 # ============================================================
@@ -180,56 +209,62 @@ def fetch_config():
 
 def send_data(temp, hum):
     """
-    Trimite temp/hum la ThingSpeak, cu:
-      - minim ~16 sec între două încercări
-      - până la 3 încercări dacă răspunsul este '0'
+    Trimite temp/hum la ThingSpeak folosind maparea din DEVICE_INFO:
+      - data_fields.temp  → fieldX
+      - data_fields.hum   → fieldY
+      - respectă limita de ~15 sec / canal
+      - max 3 încercări dacă răspunsul este '0'
     """
     global last_ts_update
 
+    info = INFO or {}
+    df   = info.get("data_fields", {})
+
+    # Dacă nu găsim ceva în dicționar, cădem pe field1/field2
+    f_temp = df.get("temp", "field1")
+    f_hum  = df.get("hum",  "field2")
+
     base_url = (
         "https://api.thingspeak.com/update?"
-        "api_key={}&field1={}&field2={}"
-    ).format(DATA_CHANNEL_API_KEY, temp, hum)
+        "api_key={}&{}={}&{}={}"
+    ).format(DATA_CHANNEL_API_KEY, f_temp, temp, f_hum, hum)
 
-    for attempt in range(3):  # maxim 3 încercări
+    for attempt in range(3):
         now = time.time()
         diff = now - last_ts_update
 
-        # Respectăm limita ThingSpeak: minim ~15 sec între update-uri
+        # limită ThingSpeak ~15 sec
         if diff < 16:
             wait_s = int(16 - diff)
             print("TS[{}]: prea devreme, aștept {} sec (încercarea {})".format(
-                ROOM, wait_s, attempt+1
+                ROOM, wait_s, attempt + 1
             ))
             for _ in range(wait_s):
                 time.sleep(1)
-                wdt.feed()   # să nu se supere watchdog-ul
+                wdt.feed()
 
         try:
             r = urequests.get(base_url)
             resp = r.text.strip()
             r.close()
-            last_ts_update = time.time()  # am făcut o încercare
+            last_ts_update = time.time()
 
             print("TS[{}]: DATA (încercarea {}) → {}".format(
-                ROOM, attempt+1, resp
+                ROOM, attempt + 1, resp
             ))
 
             if resp != "0":
-                # succes – entry_id > 0
                 return True
 
-            # dacă e "0", ThingSpeak nu a acceptat (prea devreme / alt motiv)
             print("TS[{}]: răspuns 0 (nu a acceptat). Reîncerc...".format(ROOM))
 
         except Exception as e:
             print("TS[{}]: Eroare DATA (încercarea {}): {}".format(
-                ROOM, attempt+1, e
+                ROOM, attempt + 1, e
             ))
 
     print("TS[{}]: am renunțat după 3 încercări fără succes.".format(ROOM))
     return False
-
 
 # ============================================================
 # 8. Telegram
