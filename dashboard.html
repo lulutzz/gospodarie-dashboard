@@ -1,200 +1,168 @@
 <!DOCTYPE html>
 <html lang="ro">
 <head>
-    <meta charset="UTF-8">
-    <title>ESP32 Dashboard – Comenzi cu ACK</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <script src="https://unpkg.com/paho-mqtt/mqttws31.min.js"></script>
-
-    <style>
-        body { background:#0b1f12; color:#e9f5ea; font-family:Arial; margin:0; }
-        h1 { margin:0 0 10px; }
-        .page { max-width:1000px; margin:auto; padding:20px; }
-
-        .card {
-            background:#12281a;
-            padding:15px;
-            border-radius:14px;
-            margin-bottom:12px;
-            border:1px solid #27402d;
-        }
-
-        .device-title {
-            font-size:1.2rem;
-            display:flex;
-            justify-content:space-between;
-            margin-bottom:6px;
-        }
-
-        .status-dot {
-            width:10px; height:10px; border-radius:50%;
-            background:#555;
-        }
-        .status-dot.online { background:#00e676; box-shadow:0 0 6px #00e676; }
-        .status-dot.offline { background:#ff5252; box-shadow:0 0 6px #ff5252; }
-
-        button {
-            padding:6px 12px;
-            margin-right:6px;
-            border-radius:12px;
-            border:1px solid #4caf50;
-            background:#1a3d26;
-            color:white;
-            cursor:pointer;
-        }
-        button:hover { background:#2a5d36; }
-        button.red { border-color:#ff5252; }
-        button.yellow { border-color:#ffb300; }
-
-        .log-box {
-            background:#00000060;
-            border:1px solid #27402d;
-            padding:8px;
-            margin-top:10px;
-            height:140px;
-            overflow-y:auto;
-            font-size:0.8rem;
-            white-space:pre-wrap;
-            border-radius:10px;
-        }
-
-        #mqtt-status { margin-bottom:14px; }
-    </style>
+  <meta charset="UTF-8">
+  <title>Dashboard ESP32 – Gospodărie</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/paho-mqtt.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --accent: #38bdf8;
+      --danger: #ef4444;
+      --success: #22c55e;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 0;
+      font-family: system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex; height: 100vh;
+    }
+    .sidebar {
+      width: 280px; background: #1e293b;
+      border-right: 1px solid rgba(255,255,255,0.05);
+      padding: 16px; overflow-y: auto;
+    }
+    .main {
+      flex: 1; padding: 20px;
+      overflow-y: auto;
+    }
+    .device-card {
+      background: var(--card-bg);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 12px;
+      padding: 14px; margin-bottom: 16px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+    }
+    .device-header {
+      display: flex; justify-content: space-between;
+      align-items: center; margin-bottom: 10px;
+    }
+    .device-id {
+      font-weight: bold; font-size: 1rem;
+    }
+    .status-dot {
+      width: 10px; height: 10px;
+      border-radius: 999px; display: inline-block;
+    }
+    .online { background: var(--success); }
+    .offline { background: var(--danger); }
+    .device-body {
+      font-size: 0.9rem;
+    }
+    .controls button {
+      background: var(--accent); border: none;
+      padding: 6px 10px; border-radius: 8px;
+      margin-right: 6px; cursor: pointer;
+    }
+    .controls button:hover { filter: brightness(1.1); }
+  </style>
 </head>
-
 <body>
-<div class="page">
-
-    <h1>ESP32 Dashboard – Control Direct</h1>
-
-    <div id="mqtt-status">🔴 MQTT: deconectat</div>
-
-    <!-- Camara -->
-    <div class="card">
-        <div class="device-title">
-            Cămară
-            <span id="dot-EC62609C8900" class="status-dot"></span>
-        </div>
-
-        <button onclick="sendCmd('EC62609C8900','ping')">Ping</button>
-        <button class="yellow" onclick="sendCmd('EC62609C8900','run')">Run</button>
-        <button class="red" onclick="sendCmd('EC62609C8900','reboot')">Reboot</button>
-
-        <div class="log-box" id="log-EC62609C8900"></div>
-    </div>
-
-    <!-- Bucatarie -->
-    <div class="card">
-        <div class="device-title">
-            Bucătărie
-            <span id="dot-7821849F8900" class="status-dot"></span>
-        </div>
-
-        <button onclick="sendCmd('7821849F8900','ping')">Ping</button>
-        <button class="yellow" onclick="sendCmd('7821849F8900','run')">Run</button>
-        <button class="red" onclick="sendCmd('7821849F8900','reboot')">Reboot</button>
-
-        <div class="log-box" id="log-7821849F8900"></div>
-    </div>
-
-    <div class="card">
-        <h3>Log MQTT</h3>
-        <div class="log-box" id="log-mqtt"></div>
-    </div>
-
-</div>
+  <div class="sidebar">
+    <h2>Dispozitive ESP32</h2>
+    <div id="deviceList"></div>
+  </div>
+  <div class="main">
+    <h1>Panou Control Gospodărie</h1>
+    <p>Status live & comenzi prin MQTT – HiveMQ Cloud</p>
+  </div>
 
 <script>
-const HOST = "c72cc38c1f184d0199cc4daa938bac6f.s1.eu.hivemq.cloud";
-const PORT = 8884;
-const PATH = "/mqtt";
-const USER = "burlusi";
-const PASS = "Burlusi166?";
-const BASE = "/gosp/";
-const CMD = "/cmd/";
-const ACK = "/ack";
-const STATUS = "/status";
-const LOG = "/log";
+  const deviceList = document.getElementById('deviceList');
+  const devices = {}; // ID → state
 
-let client = null;
-let clientId = "WEB_" + Math.random().toString(16).substr(2,8);
+  const mqttHost = "c72cc38c1f184d0199cc4daa938bac6f.s1.eu.hivemq.cloud";
+  const mqttPort = 8884;
+  const mqttPath = "/mqtt";
+  const clientId = "dashboard_" + Math.random().toString(16).substr(2, 6);
+  const mqttUser = "burlusi";
+  const mqttPass = "Burlusi166?";
 
-function log(boxId, msg) {
-    const box = document.getElementById(boxId);
-    const t = new Date().toLocaleTimeString();
-    box.textContent += `[${t}] ${msg}\n`;
-    box.scrollTop = box.scrollHeight;
-}
+  const client = new Paho.MQTT.Client(mqttHost, mqttPort, mqttPath, clientId);
 
-function setOnline(id, online) {
-    let dot = document.getElementById("dot-" + id);
-    dot.classList.remove("online","offline");
-    dot.classList.add(online ? "online" : "offline");
-}
+  client.onConnectionLost = err => console.warn("Conexiune pierdută", err);
+  client.onMessageArrived = msg => {
+    const topic = msg.destinationName;
+    const payload = msg.payloadString;
+    const parts = topic.split("/");
+    if (parts.length < 3) return;
+    const deviceID = parts[1];
+    const subtopic = parts.slice(2).join("/");
 
-function connectMQTT() {
-    client = new Paho.MQTT.Client(HOST, PORT, PATH, clientId);
-    client.onConnectionLost = () => {
-        document.getElementById("mqtt-status").textContent = "🔴 MQTT: deconectat";
-        setTimeout(connectMQTT, 2000);
-    };
+    if (!devices[deviceID]) createDeviceCard(deviceID);
 
-    client.onMessageArrived = onMsg;
+    if (subtopic === "status") {
+      updateStatus(deviceID, payload);
+    } else if (subtopic === "sensors") {
+      try {
+        const data = JSON.parse(payload);
+        updateSensor(deviceID, data);
+      } catch(e) {}
+    }
+  };
 
+  function connectMQTT() {
     client.connect({
-        useSSL:true,
-        userName:USER,
-        password:PASS,
-        timeout:8,
-        keepAliveInterval:20,
-        onSuccess:() => {
-            document.getElementById("mqtt-status").textContent = "🟢 MQTT: conectat";
-
-            client.subscribe(BASE + "+/status");
-            client.subscribe(BASE + "+/log");
-            client.subscribe(BASE + "+/cmd/ack");
-        }
+      useSSL: true,
+      userName: mqttUser,
+      password: mqttPass,
+      onSuccess: () => {
+        console.log("✔ Conectat la broker MQTT");
+        client.subscribe("home/+/status");
+        client.subscribe("home/+/sensors");
+      },
+      onFailure: err => console.error("❌ Eroare conectare MQTT", err)
     });
-}
+  }
 
-function onMsg(msg) {
-    log("log-mqtt", msg.destinationName + " = " + msg.payloadString);
+  function createDeviceCard(id) {
+    const el = document.createElement("div");
+    el.className = "device-card";
+    el.id = `dev-${id}`;
+    el.innerHTML = `
+      <div class="device-header">
+        <span class="device-id">${id}</span>
+        <span class="status-dot offline" id="status-${id}"></span>
+      </div>
+      <div class="device-body">
+        <div id="data-${id}">...</div>
+        <div class="controls">
+          <button onclick="sendCmd('${id}', 'ping')">Ping</button>
+          <button onclick="sendCmd('${id}', 'reboot')">Reboot</button>
+          <button onclick="sendCmd('${id}', 'reset')">Reset</button>
+        </div>
+      </div>
+    `;
+    deviceList.appendChild(el);
+    devices[id] = true;
+  }
 
-    if (msg.destinationName.endsWith("/status")) {
-        let id = msg.destinationName.split("/")[2];
-        setOnline(id, true);
-    }
+  function updateStatus(id, payload) {
+    const dot = document.getElementById(`status-${id}`);
+    if (!dot) return;
+    dot.className = "status-dot " + (payload === "offline" ? "offline" : "online");
+  }
 
-    if (msg.destinationName.endsWith("/log")) {
-        let id = msg.destinationName.split("/")[2];
-        log("log-" + id, msg.payloadString);
-    }
+  function updateSensor(id, data) {
+    const el = document.getElementById(`data-${id}`);
+    if (!el) return;
+    el.innerHTML = `Temp: ${data.temp}°C<br>Umiditate: ${data.hum}%`;
+  }
 
-    if (msg.destinationName.endsWith("/ack")) {
-        let id = msg.destinationName.split("/")[2];
-        log("log-" + id, "ACK: " + msg.payloadString);
-    }
-}
+  function sendCmd(id, cmd) {
+    const topic = `home/${id}/cmd/${cmd}`;
+    const msg = new Paho.MQTT.Message("");
+    msg.destinationName = topic;
+    client.send(msg);
+  }
 
-function sendCmd(deviceId, cmd) {
-    if (!client || !client.isConnected()) {
-        alert("MQTT nu este conectat!");
-        return;
-    }
-    let topic = BASE + deviceId + CMD + cmd;
-    let ackTopic = BASE + deviceId + CMD + "ack";
-
-    client.subscribe(ackTopic);
-    client.send(new Paho.MQTT.Message("1").setDestinationName(topic));
-
-    log("log-" + deviceId, "Trimis CMD: " + cmd);
-
-    setTimeout(() => {
-        log("log-" + deviceId, "⚠ Timeout ACK pentru cmd " + cmd);
-    }, 4000);
-}
-
-connectMQTT();
+  connectMQTT();
 </script>
 </body>
 </html>
