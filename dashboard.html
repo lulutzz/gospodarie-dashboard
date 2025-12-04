@@ -2,13 +2,10 @@
 <html lang="ro">
 <head>
   <meta charset="UTF-8">
-  <title>Dashboard ESP32 – Gospodărie1</title>
+  <title>Dashboard ESP32 – Gospodărie</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!--<script src="https://unpkg.com/paho-mqtt/mqttws31.min.js"></script>-->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/paho-mqtt.min.js"></script>
-  <script>
-  console.log("Paho.Client este", typeof Paho?.Client);
-  </script>
-
   <style>
     :root {
       --bg: #0f172a;
@@ -87,12 +84,14 @@ window.addEventListener("load", function () {
   const mqttPath = "/mqtt";
   const mqttUser = "burlusi";
   const mqttPass = "Burlusi166?";
+  // CONFIG MQTT
+  const host = "c72cc38c1f184d0199cc4daa938bac6f.s1.eu.hivemq.cloud";
+  const port = 8884;              // WebSocket TLS
+  const path = "/mqtt";           // default HiveMQ WS path
   const clientId = "webclient_" + Math.random().toString(16).substr(2, 8);
 
-  const client = new Paho.MQTT.Client(mqttHost, mqttPort, mqttPath, clientId);
-
+  const client = new Paho.Client(host, port, path, clientId);
   client.onConnectionLost = err => console.warn("Conexiune pierdută", err);
-
   client.onMessageArrived = msg => {
     const topic = msg.destinationName;
     const payload = msg.payloadString;
@@ -109,9 +108,7 @@ window.addEventListener("load", function () {
       try {
         const data = JSON.parse(payload);
         updateSensor(deviceID, data);
-      } catch(e) {
-        console.error("Eroare parsare date sensor:", e);
-      }
+      } catch(e) {}
     }
   };
 
@@ -163,7 +160,7 @@ window.addEventListener("load", function () {
     el.innerHTML = `Temp: ${data.temp}°C<br>Umiditate: ${data.hum}%`;
   }
 
-  window.sendCmd = function(id, cmd) {
+  function sendCmd(id, cmd) {
     const topic = `home/${id}/cmd/${cmd}`;
     const msg = new Paho.MQTT.Message("");
     msg.destinationName = topic;
