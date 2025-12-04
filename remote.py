@@ -277,9 +277,5 @@ while True:
         continue
 
     # PRODUCȚIE
-
-    minutes = cfg.get("sleep_minutes", 5)
     print("Sleep:", minutes, "minute (soft)")
-
-    for _ in range(int(minutes * 60)):
-        time.sleep(1)
+    time.sleep(10)
