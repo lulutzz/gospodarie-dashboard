@@ -87,13 +87,14 @@ def get_device_id():
     except:
         return "UNKNOWN"
 
-
 DEVICE_ID = get_device_id()
 ROOM = DEVICE_INFO.get(DEVICE_ID, {}).get("name", "UNKNOWN")
+INFO = DEVICE_INFO.get(DEVICE_ID, {})   # <– NOU
 
-print("=== remote.py v1.2 ===")
+print("=== remote.py v1.3 ===")
 print("Device:", DEVICE_ID)
 print("Camera:", ROOM)
+print("INFO:", INFO)
 
 
 # ============================================================
@@ -149,7 +150,6 @@ def fetch_config():
     url = "https://api.thingspeak.com/channels/{}/feeds.json?results=1".format(
         CONFIG_CHANNEL
     )
-
     print("Citire CONFIG din:", url)
 
     try:
@@ -173,16 +173,16 @@ def fetch_config():
                 return default
 
         cfg = {}
-
-        # ---------- valori globale (valabile pentru toate device-urile) ----------
+        # globale
         cfg["sleep_minutes"] = read_int("field1", 30)
         cfg["DEBUGGING"]     = read_int("field8", 1)
 
-        # ---------- praguri specifice device-ului ----------
+        # specifice device-ului curent
         info = INFO or {}
         cfg_fields = info.get("config_fields", {})
+        print("cfg_fields pentru", ROOM, ":", cfg_fields)
 
-        temp_field = cfg_fields.get("alarm_temp", "field2")  # default Camara
+        temp_field = cfg_fields.get("alarm_temp", "field2")
         hum_field  = cfg_fields.get("alarm_hum",  "field3")
 
         cfg["alarm_temp"] = read_int(temp_field, 25)
@@ -203,24 +203,17 @@ def fetch_config():
 # ============================================================
 # 7. Trimitere date în DATA – Gospodarie
 # ============================================================
-# ============================================================
-# 7. Trimitere date în DATA – Gospodarie
-# ============================================================
 
 def send_data(temp, hum):
     """
-    Trimite temp/hum la ThingSpeak folosind maparea din DEVICE_INFO:
-      - data_fields.temp  → fieldX
-      - data_fields.hum   → fieldY
-      - respectă limita de ~15 sec / canal
-      - max 3 încercări dacă răspunsul este '0'
+    Trimite temp/hum la ThingSpeak folosind maparea din DEVICE_INFO.
     """
     global last_ts_update
 
     info = INFO or {}
     df   = info.get("data_fields", {})
+    print("data_fields pentru", ROOM, ":", df)
 
-    # Dacă nu găsim ceva în dicționar, cădem pe field1/field2
     f_temp = df.get("temp", "field1")
     f_hum  = df.get("hum",  "field2")
 
@@ -228,6 +221,8 @@ def send_data(temp, hum):
         "https://api.thingspeak.com/update?"
         "api_key={}&{}={}&{}={}"
     ).format(DATA_CHANNEL_API_KEY, f_temp, temp, f_hum, hum)
+
+    print("TS[{}]: URL → {}".format(ROOM, base_url))
 
     for attempt in range(3):
         now = time.time()
