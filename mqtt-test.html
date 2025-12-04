@@ -1,28 +1,77 @@
-console.log("Conectare MQTT WebSocket TLS...");
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<title>Test MQTT Web</title>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/paho-mqtt.min.js"></script>
+
+<style>
+    body { font-family: Arial; padding: 20px; }
+    #log { white-space: pre-line; border: 1px solid #ccc; padding: 10px; height: 250px; overflow-y: auto; }
+</style>
+</head>
+
+<body>
+
+<h2>Test Conexiune MQTT Web → HiveMQ Cloud</h2>
+<div id="log"></div>
+
+<script>
+function log(msg) {
+    console.log(msg);
+    document.getElementById("log").innerText += msg + "\n";
+}
+
+// CONFIG MQTT
 const host = "c72cc38c1f184d0199cc4daa938bac6f.s1.eu.hivemq.cloud";
-const port = 8884;
-const path = "/mqtt";
+const port = 8884;              // WebSocket TLS
+const path = "/mqtt";           // default HiveMQ WS path
 const clientId = "webclient_" + Math.random().toString(16).substr(2, 8);
 
-const client = new Paho.Client(host, port, path, clientId);
+log("ClientId = " + clientId);
+
+// Creează clientul Paho MQTT
+let client = new Paho.Client(host, port, path, clientId);
+
+client.onConnectionLost = function(response) {
+    log("Conexiune pierdută: " + response.errorMessage);
+};
+
+client.onMessageArrived = function(message) {
+    log("Mesaj primit pe " + message.destinationName + ": " + message.payloadString);
+};
+
+// Conectare MQTT
+log("Conectare la HiveMQ Cloud...");
 
 client.connect({
     useSSL: true,
     userName: "burlusi",
     password: "Burlusi166?",
     timeout: 10,
-    onSuccess: function () {
-        console.log("Conectat cu succes!");
 
-        // Exemplu subscribere
-        client.subscribe("/gosp/test");
-        console.log("Subscribed la /gosp/test");
+    onSuccess: function() {
+        log("✔ Conectat cu succes la MQTT!");
 
-        // Exemplu publish
-        client.send("/gosp/test", "Hello from web!", 0);
+        // SUBSCRIBE
+        const subTopic = "/gosp/test";
+        client.subscribe(subTopic);
+        log("✔ Subscribed la topic: " + subTopic);
+
+        // PUBLISH test
+        const msg = new Paho.Message("Salut din dashboard Web!");
+        msg.destinationName = subTopic;
+        client.send(msg);
+
+        log("✔ Mesaj trimis către " + subTopic);
     },
-    onFailure: function (err) {
-        console.error("Conectare eșuată:", err.errorMessage);
+
+    onFailure: function(err) {
+        log("❌ Eroare conectare: " + err.errorMessage);
     }
 });
+</script>
+
+</body>
+</html>
