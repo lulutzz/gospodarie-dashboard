@@ -1,108 +1,172 @@
 <!DOCTYPE html>
 <html lang="ro">
 <head>
-<meta charset="UTF-8">
-<title>Panou Control ESP32 – MQTT2</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/paho-mqtt.min.js"></script>
-<style>
-    body { margin: 0; font-family: sans-serif; display: flex; height: 100vh; background: #0f172a; color: #fff; }
-    .sidebar { width: 220px; background: #1e293b; padding: 20px; box-shadow: 2px 0 5px rgba(0,0,0,0.2); }
-    .main { flex: 1; padding: 20px; background: #0f172a; }
-    h1 { margin-top: 0; }
-    .card { background: #111827; border: 1px solid #334155; border-radius: 10px; padding: 16px; margin-bottom: 12px; }
-    .id { font-weight: bold; font-size: 1.1em; }
-    .status { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: gray; margin-left: 6px; }
-    .status.online { background: #22c55e; }
-    .status.offline { background: #f43f5e; }
-    .btn { padding: 6px 12px; margin: 6px 4px 0 0; border: none; border-radius: 6px; background: #0ea5e9; color: #000; cursor: pointer; font-weight: bold; }
-</style>
+  <meta charset="UTF-8">
+  <title>Dashboard ESP32 – Gospodărie</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/paho-mqtt.min.js"></script>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --accent: #38bdf8;
+      --danger: #ef4444;
+      --success: #22c55e;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 0;
+      font-family: system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      display: flex; height: 100vh;
+    }
+    .sidebar {
+      width: 280px; background: #1e293b;
+      border-right: 1px solid rgba(255,255,255,0.05);
+      padding: 16px; overflow-y: auto;
+    }
+    .main {
+      flex: 1; padding: 20px;
+      overflow-y: auto;
+    }
+    .device-card {
+      background: var(--card-bg);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 12px;
+      padding: 14px; margin-bottom: 16px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+    }
+    .device-header {
+      display: flex; justify-content: space-between;
+      align-items: center; margin-bottom: 10px;
+    }
+    .device-id {
+      font-weight: bold; font-size: 1rem;
+    }
+    .status-dot {
+      width: 10px; height: 10px;
+      border-radius: 999px; display: inline-block;
+    }
+    .online { background: var(--success); }
+    .offline { background: var(--danger); }
+    .device-body {
+      font-size: 0.9rem;
+    }
+    .controls button {
+      background: var(--accent); border: none;
+      padding: 6px 10px; border-radius: 8px;
+      margin-right: 6px; cursor: pointer;
+    }
+    .controls button:hover { filter: brightness(1.1); }
+  </style>
 </head>
 <body>
-<div class="sidebar">
-  <h2>Dispozitive ESP32</h2>
-  <div id="devices"></div>
-</div>
-<div class="main">
-  <h1>Panou Control Gospodărie</h1>
-  <p>Status live & comenzi prin MQTT – HiveMQ Cloud</p>
-</div>
+  <div class="sidebar">
+    <h2>Dispozitive ESP32</h2>
+    <div id="deviceList"></div>
+  </div>
+  <div class="main">
+    <h1>Panou Control Gospodărie</h1>
+    <p>Status live & comenzi prin MQTT – HiveMQ Cloud</p>
+  </div>
+
 <script>
-const devices = {};  // va conține toate cardurile per dispozitiv
-const container = document.getElementById("devices");
+window.addEventListener("load", function () {
+  const deviceList = document.getElementById('deviceList');
+  const devices = {}; // ID → state
 
-function createCard(id) {
-  const card = document.createElement("div");
-  card.className = "card";
+  const mqttHost = "c72cc38c1f184d0199cc4daa938bac6f.s1.eu.hivemq.cloud";
+  const mqttPort = 8884;
+  const mqttPath = "/mqtt";
+  const mqttUser = "burlusi";
+  const mqttPass = "Burlusi166?";
+  const clientId = "webclient_" + Math.random().toString(16).substr(2, 8);
 
-  const label = document.createElement("div");
-  label.innerHTML = `<span class="id">${id}</span> <span class="status" id="status-${id}"></span>`;
-  card.appendChild(label);
+  const client = new Paho.MQTT.Client(mqttHost, mqttPort, mqttPath, clientId);
 
-  const log = document.createElement("div");
-  log.id = "log-" + id;
-  log.style.fontSize = "0.8em";
-  log.style.opacity = 0.6;
-  log.style.marginTop = "4px";
-  log.innerText = "...";
-  card.appendChild(log);
+  client.onConnectionLost = err => console.warn("Conexiune pierdută", err);
 
-  const btns = ["ping", "reboot", "reset"];
-  btns.forEach(cmd => {
-    const btn = document.createElement("button");
-    btn.className = "btn";
-    btn.innerText = cmd[0].toUpperCase() + cmd.slice(1);
-    btn.onclick = () => {
-      const topic = `home/${id}/cmd/${cmd}`;
-      const msg = new Paho.MQTT.Message("from web");
-      msg.destinationName = topic;
-      client.send(msg);
-    };
-    card.appendChild(btn);
-  });
+  client.onMessageArrived = msg => {
+    const topic = msg.destinationName;
+    const payload = msg.payloadString;
+    const parts = topic.split("/");
+    if (parts.length < 3) return;
+    const deviceID = parts[1];
+    const subtopic = parts.slice(2).join("/");
 
-  container.appendChild(card);
-  devices[id] = card;
-}
+    if (!devices[deviceID]) createDeviceCard(deviceID);
 
-function updateStatus(id, isOnline) {
-  const el = document.getElementById("status-" + id);
-  if (!el) return;
-  el.className = "status " + (isOnline ? "online" : "offline");
-}
+    if (subtopic === "status") {
+      updateStatus(deviceID, payload);
+    } else if (subtopic === "sensors") {
+      try {
+        const data = JSON.parse(payload);
+        updateSensor(deviceID, data);
+      } catch(e) {
+        console.error("Eroare parsare date sensor:", e);
+      }
+    }
+  };
 
-function updateLog(id, msg) {
-  const el = document.getElementById("log-" + id);
-  if (el) el.innerText = msg;
-}
-
-const client = new Paho.MQTT.Client(
-  "c72cc38c1f184d0199cc4daa938bac6f.s1.eu.hivemq.cloud",
-  8884,
-  "/mqtt",
-  "webclient_" + Math.random().toString(16).substr(2, 8)
-);
-
-client.onConnectionLost = err => console.error("Pierdut conexiunea:", err);
-
-client.onMessageArrived = msg => {
-  const topic = msg.destinationName;
-  const payload = msg.payloadString;
-  const match = topic.match(/^home\/(.*?)\/(status|sensors|log)$/);
-  if (!match) return;
-  const [_, id, type] = match;
-  if (!devices[id]) createCard(id);
-  if (type === "status") updateStatus(id, payload === "online");
-  if (type === "log") updateLog(id, payload);
-};
-
-client.connect({
-  useSSL: true,
-  userName: "burlusi",
-  password: "Burlusi166?",
-  onSuccess: () => {
-    client.subscribe("home/+/status");
-    client.subscribe("home/+/log");
+  function connectMQTT() {
+    client.connect({
+      useSSL: true,
+      userName: mqttUser,
+      password: mqttPass,
+      onSuccess: () => {
+        console.log("✔ Conectat la broker MQTT");
+        client.subscribe("home/+/status");
+        client.subscribe("home/+/sensors");
+      },
+      onFailure: err => console.error("❌ Eroare conectare MQTT", err)
+    });
   }
+
+  function createDeviceCard(id) {
+    const el = document.createElement("div");
+    el.className = "device-card";
+    el.id = `dev-${id}`;
+    el.innerHTML = `
+      <div class="device-header">
+        <span class="device-id">${id}</span>
+        <span class="status-dot offline" id="status-${id}"></span>
+      </div>
+      <div class="device-body">
+        <div id="data-${id}">...</div>
+        <div class="controls">
+          <button onclick="sendCmd('${id}', 'ping')">Ping</button>
+          <button onclick="sendCmd('${id}', 'reboot')">Reboot</button>
+          <button onclick="sendCmd('${id}', 'reset')">Reset</button>
+        </div>
+      </div>
+    `;
+    deviceList.appendChild(el);
+    devices[id] = true;
+  }
+
+  function updateStatus(id, payload) {
+    const dot = document.getElementById(`status-${id}`);
+    if (!dot) return;
+    dot.className = "status-dot " + (payload === "offline" ? "offline" : "online");
+  }
+
+  function updateSensor(id, data) {
+    const el = document.getElementById(`data-${id}`);
+    if (!el) return;
+    el.innerHTML = `Temp: ${data.temp}°C<br>Umiditate: ${data.hum}%`;
+  }
+
+  window.sendCmd = function(id, cmd) {
+    const topic = `home/${id}/cmd/${cmd}`;
+    const msg = new Paho.MQTT.Message("");
+    msg.destinationName = topic;
+    client.send(msg);
+  }
+
+  connectMQTT();
 });
 </script>
 </body>
