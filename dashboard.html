@@ -159,14 +159,12 @@ window.addEventListener("load", function () {
     if (!el) return;
     el.innerHTML = `Temp: ${data.temp}°C<br>Umiditate: ${data.hum}%`;
   }
-
-  function sendCmd(id, cmd) {
+  window.sendCmd = function(id, cmd) {
     const topic = `home/${id}/cmd/${cmd}`;
     const msg = new Paho.MQTT.Message("");
     msg.destinationName = topic;
     client.send(msg);
   }
-
   connectMQTT();
 });
 </script>
