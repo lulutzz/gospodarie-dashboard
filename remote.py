@@ -175,19 +175,55 @@ def fetch_config():
 # 7. Trimitere date în DATA – Gospodarie
 # ============================================================
 
-def send_data(temp, hum):
-    url = (
-        "https://api.thingspeak.com/update?"
-        "api_key={}&field1={}&field2={}"
-    ).format(DATA_CHANNEL_API_KEY, temp, hum)
+DATA_CHANNEL_API_KEY = "..."  # cum o ai tu acum
 
-    try:
-        r = urequests.get(url)
-        print("DATA:", r.text)
-        r.close()
-    except Exception as e:
-        print("Eroare DATA:", e)
-
+    def send_data(temp, hum):
+        """
+        Trimite temp/hum la ThingSpeak, cu:
+          - minim ~16 sec între două încercări
+          - până la 3 încercări dacă răspunsul este '0'
+        """
+        global last_ts_update
+    
+        base_url = (
+            "https://api.thingspeak.com/update?"
+            "api_key={}&field1={}&field2={}"
+        ).format(DATA_CHANNEL_API_KEY, temp, hum)
+    
+        for attempt in range(3):  # maxim 3 încercări
+            now = time.time()
+            diff = now - last_ts_update
+    
+            # Respectăm limita ThingSpeak: minim ~15 sec între update-uri
+            if diff < 16:
+                wait_s = int(16 - diff)
+                print("TS: prea devreme, aștept", wait_s, "sec înainte de trimitere (încercarea", attempt+1, ")")
+                for _ in range(wait_s):
+                    time.sleep(1)
+    
+            try:
+                r = urequests.get(base_url)
+                resp = r.text.strip()
+                r.close()
+                last_ts_update = time.time()  # am făcut o încercare (reținut momentul)
+    
+                print("DATA (încercarea", attempt+1, "):", resp)
+    
+                if resp != "0":
+                    # succes – ThingSpeak a acceptat (îți întoarce un entry_id > 0)
+                    return True
+    
+                # dacă e "0", înseamnă că TS nu a acceptat (prea devreme / altă eroare)
+                print("TS: răspuns 0 (nu a acceptat). Pregătesc reîncercare...")
+    
+            except Exception as e:
+                print("Eroare DATA (încercarea", attempt+1, "):", e)
+                # la erori de rețea nu are rost să insistăm imediat; bucla va continua și mai sus punem din nou pauză
+    
+        print("TS: am renunțat după 3 încercări fără succes.")
+        return False
+    
+    
 
 # ============================================================
 # 8. Telegram
