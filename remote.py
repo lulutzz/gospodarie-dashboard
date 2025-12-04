@@ -273,7 +273,7 @@ while True:
     # DEBUGGING → fără deep sleep, doar pauză scurtă
     if cfg["DEBUGGING"] == 1:
         print("DEBUG → reluare 10 sec (soft)")
-        for _ in range(10):
+        for _ in range(30):
             time.sleep(1)
         continue
 
