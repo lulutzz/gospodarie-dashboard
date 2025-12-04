@@ -33,7 +33,7 @@ WIFI_PASS = "Burlusi166?"
 
 CONFIG_CHANNEL = 1622205         # CONFIG – Gospodarie
 DATA_CHANNEL_API_KEY = "ZPT57WZJNMLGM2X1"   # DATA – Gospodarie
-
+last_ts_update = 0
 TELEGRAM_BOT_TOKEN = "8532839048:AAEznUxSlaUMeNBmxZ0aFT_8vCHnlNqJ4dI"
 TELEGRAM_CHAT_ID   = "1705327493"
 
@@ -174,56 +174,62 @@ def fetch_config():
 # ============================================================
 # 7. Trimitere date în DATA – Gospodarie
 # ============================================================
+# ============================================================
+# 7. Trimitere date în DATA – Gospodarie
+# ============================================================
 
-DATA_CHANNEL_API_KEY = "..."  # cum o ai tu acum
+def send_data(temp, hum):
+    """
+    Trimite temp/hum la ThingSpeak, cu:
+      - minim ~16 sec între două încercări
+      - până la 3 încercări dacă răspunsul este '0'
+    """
+    global last_ts_update
 
-    def send_data(temp, hum):
-        """
-        Trimite temp/hum la ThingSpeak, cu:
-          - minim ~16 sec între două încercări
-          - până la 3 încercări dacă răspunsul este '0'
-        """
-        global last_ts_update
-    
-        base_url = (
-            "https://api.thingspeak.com/update?"
-            "api_key={}&field1={}&field2={}"
-        ).format(DATA_CHANNEL_API_KEY, temp, hum)
-    
-        for attempt in range(3):  # maxim 3 încercări
-            now = time.time()
-            diff = now - last_ts_update
-    
-            # Respectăm limita ThingSpeak: minim ~15 sec între update-uri
-            if diff < 16:
-                wait_s = int(16 - diff)
-                print("TS: prea devreme, aștept", wait_s, "sec înainte de trimitere (încercarea", attempt+1, ")")
-                for _ in range(wait_s):
-                    time.sleep(1)
-    
-            try:
-                r = urequests.get(base_url)
-                resp = r.text.strip()
-                r.close()
-                last_ts_update = time.time()  # am făcut o încercare (reținut momentul)
-    
-                print("DATA (încercarea", attempt+1, "):", resp)
-    
-                if resp != "0":
-                    # succes – ThingSpeak a acceptat (îți întoarce un entry_id > 0)
-                    return True
-    
-                # dacă e "0", înseamnă că TS nu a acceptat (prea devreme / altă eroare)
-                print("TS: răspuns 0 (nu a acceptat). Pregătesc reîncercare...")
-    
-            except Exception as e:
-                print("Eroare DATA (încercarea", attempt+1, "):", e)
-                # la erori de rețea nu are rost să insistăm imediat; bucla va continua și mai sus punem din nou pauză
-    
-        print("TS: am renunțat după 3 încercări fără succes.")
-        return False
-    
-    
+    base_url = (
+        "https://api.thingspeak.com/update?"
+        "api_key={}&field1={}&field2={}"
+    ).format(DATA_CHANNEL_API_KEY, temp, hum)
+
+    for attempt in range(3):  # maxim 3 încercări
+        now = time.time()
+        diff = now - last_ts_update
+
+        # Respectăm limita ThingSpeak: minim ~15 sec între update-uri
+        if diff < 16:
+            wait_s = int(16 - diff)
+            print("TS[{}]: prea devreme, aștept {} sec (încercarea {})".format(
+                ROOM, wait_s, attempt+1
+            ))
+            for _ in range(wait_s):
+                time.sleep(1)
+                wdt.feed()   # să nu se supere watchdog-ul
+
+        try:
+            r = urequests.get(base_url)
+            resp = r.text.strip()
+            r.close()
+            last_ts_update = time.time()  # am făcut o încercare
+
+            print("TS[{}]: DATA (încercarea {}) → {}".format(
+                ROOM, attempt+1, resp
+            ))
+
+            if resp != "0":
+                # succes – entry_id > 0
+                return True
+
+            # dacă e "0", ThingSpeak nu a acceptat (prea devreme / alt motiv)
+            print("TS[{}]: răspuns 0 (nu a acceptat). Reîncerc...".format(ROOM))
+
+        except Exception as e:
+            print("TS[{}]: Eroare DATA (încercarea {}): {}".format(
+                ROOM, attempt+1, e
+            ))
+
+    print("TS[{}]: am renunțat după 3 încercări fără succes.".format(ROOM))
+    return False
+
 
 # ============================================================
 # 8. Telegram
@@ -288,8 +294,11 @@ while True:
         h = None
 
     # Trimite date
+    # Trimite date
     if t is not None and h is not None:
-        send_data(t, h)
+        print("SENZOR:", ROOM, "T=", t, "H=", h)
+        ok_ts = send_data(t, h)
+        print("TS trimis pentru", ROOM, "ok?", ok_ts)
 
     # Alerte
     if t is not None and t >= cfg["alarm_temp"]:
