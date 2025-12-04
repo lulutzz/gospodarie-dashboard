@@ -1,106 +1,303 @@
 <!DOCTYPE html>
-<html lang="ro">
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>HiveMQ Cloud MQTT WebSocket Example</title>
-  <!-- Paho MQTT library (CDN) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/paho-mqtt.min.js"></script>
+  <meta charset="UTF-8">
+  <title>HiveMQ Paho WebSocket Debug</title>
 </head>
 <body>
-  <h1>HiveMQ Cloud MQTT WebSocket Example</h1>
-  <p>Stare conexiune: <span id="connectionStatus">Neconectat</span></p>
-  <div>
-    <button id="pingBtn" disabled>Trimite Ping</button>
-    <button id="runBtn" disabled>Trimite Run</button>
-    <button id="rebootBtn" disabled>Trimite Reboot</button>
-  </div>
-  <h2>Mesaje Status</h2>
-  <div id="statusMessages" style="border:1px solid #ccc; padding:5px; min-height:50px;"></div>
-  <h2>Mesaje Log</h2>
-  <div id="logMessages" style="border:1px solid #ccc; padding:5px; min-height:50px;"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/paho-mqtt.min.js"></script>
+<script>
+// 1
+console.log("Se încearcă metoda 1: Paho.Client(host, port, path) cu useSSL, credențiale");
+var host = "YourClusterID.s2.eu.hivemq.cloud";
+var port = 8884;
+var path = "/mqtt";
+var user = "YOUR_USERNAME";
+var password = "YOUR_PASSWORD";
+var client1 = new Paho.Client(host, port, path, "test1");
+client1.connect({
+    userName: user,
+    password: password,
+    useSSL: true,
+    onSuccess: function() {
+        console.log("Conectare reușită metoda 1");
+        var msg = new Paho.Message("test");
+        msg.destinationName = "/gosp/test/cmd/";
+        client1.send(msg);
+    },
+    onFailure: function(res) {
+        console.log("Eroare metoda 1: " + res.errorCode + " - " + res.errorMessage);
+    }
+});
 
-  <script>
-    window.onload = function() {
-      // Detalii broker HiveMQ Cloud
-      var host = "NUME-CLUSTER.s2.eu.hivemq.cloud";  // ← înlocuiește cu URL-ul clusterului tău
-      var port = 8884;
-      var path = "/mqtt";
-      var clientId = "web_" + Math.floor(Math.random() * 10000);
+// 2
+console.log("Se încearcă metoda 2: Paho.Client(host, port, path) FĂRĂ useSSL, credențiale");
+var client2 = new Paho.Client(host, port, path, "test2");
+client2.connect({
+    userName: user,
+    password: password,
+    // no useSSL flag
+    onSuccess: function() {
+        console.log("Conectare reușită metoda 2");
+        var msg = new Paho.Message("test");
+        msg.destinationName = "/gosp/test/cmd/";
+        client2.send(msg);
+    },
+    onFailure: function(res) {
+        console.log("Eroare metoda 2: " + res.errorCode + " - " + res.errorMessage);
+    }
+});
 
-      // Creare instanță client MQTT (WebSocket TLS)
-      var client = new Paho.Client(host, port, path, clientId);
+// 3
+console.log("Se încearcă metoda 3: Paho.Client(host, port, path) cu useSSL, FĂRĂ credențiale");
+var client3 = new Paho.Client(host, port, path, "test3");
+client3.connect({
+    // no userName/password
+    useSSL: true,
+    onSuccess: function() {
+        console.log("Conectare reușită metoda 3");
+        var msg = new Paho.Message("test");
+        msg.destinationName = "/gosp/test/cmd/";
+        client3.send(msg);
+    },
+    onFailure: function(res) {
+        console.log("Eroare metoda 3: " + res.errorCode + " - " + res.errorMessage);
+    }
+});
 
-      // Flag stare conexiune
-      var connected = false;
-
-      // Callback: conexiune pierdută
-      client.onConnectionLost = function(responseObject) {
-        document.getElementById("connectionStatus").innerText = "Conexiune pierdută";
-        // Dezactivăm butoanele de comandă
-        document.getElementById("pingBtn").disabled = true;
-        document.getElementById("runBtn").disabled = true;
-        document.getElementById("rebootBtn").disabled = true;
-        if (responseObject.errorMessage) {
-          console.log("Connection lost: " + responseObject.errorMessage);
-        }
-      };
-
-      // Callback: mesaj sosit pe un topic
-      client.onMessageArrived = function(message) {
-        var topic = message.destinationName;
-        var payload = message.payloadString;
-        if (topic === "/status") {
-          document.getElementById("statusMessages").innerHTML += payload + "<br/>";
-        } else if (topic === "/log") {
-          document.getElementById("logMessages").innerHTML += payload + "<br/>";
-        }
-        console.log("Mesaj primit pe " + topic + ": " + payload);
-      };
-
-      // Funcție apelată la conectare reușită
-      function onConnect() {
-        connected = true;
-        document.getElementById("connectionStatus").innerText = "Conectat";
-        // Activăm butoanele de comandă acum că suntem conectați
-        document.getElementById("pingBtn").disabled = false;
-        document.getElementById("runBtn").disabled = false;
-        document.getElementById("rebootBtn").disabled = false;
-        console.log("Conexiune MQTT stabilită cu brokerul.");
-        // Ne abonăm la topicurile /status și /log
-        client.subscribe("/status");
-        client.subscribe("/log");
-      }
-
-      // Conectare la broker cu credențiale și TLS
-      client.connect({
+// 4
+console.log("Se încearcă metoda 4: Paho.Client(host, \"8884\" ca text, path) cu useSSL, credențiale");
+try {
+    var client4 = new Paho.Client(host, "8884", path, "test4");
+    client4.connect({
+        userName: user,
+        password: password,
         useSSL: true,
-        userName: "burlusi",
-        password: "Burlusi166?",
-        onSuccess: onConnect,
-        onFailure: function(err) {
-          document.getElementById("connectionStatus").innerText = "Eșec conectare";
-          console.error("Connect failed: " + (err.errorMessage || err));
+        onSuccess: function() {
+            console.log("Conectare reușită metoda 4");
+            var msg = new Paho.Message("test");
+            msg.destinationName = "/gosp/test/cmd/";
+            client4.send(msg);
+        },
+        onFailure: function(res) {
+            console.log("Eroare metoda 4: " + res.errorCode + " - " + res.errorMessage);
         }
-      });
+    });
+} catch(e) {
+    console.log("Eroare metoda 4: " + e);
+}
 
-      // Event handlers pentru butoane – trimit comenzi la topicul de comandă
-      document.getElementById("pingBtn").onclick = function() {
-        if (connected) {
-          client.send("/gosp/7821849F8900/cmd/", "ping", 0, false);
+// 5
+console.log("Se încearcă metoda 5: Paho.Client(host, port, path) cu useSSL, clientId numeric");
+try {
+    var client5 = new Paho.Client(host, port, path, 12345);
+    client5.connect({
+        userName: user,
+        password: password,
+        useSSL: true,
+        onSuccess: function() {
+            console.log("Conectare reușită metoda 5");
+            var msg = new Paho.Message("test");
+            msg.destinationName = "/gosp/test/cmd/";
+            client5.send(msg);
+        },
+        onFailure: function(res) {
+            console.log("Eroare metoda 5: " + res.errorCode + " - " + res.errorMessage);
         }
-      };
-      document.getElementById("runBtn").onclick = function() {
-        if (connected) {
-          client.send("/gosp/7821849F8900/cmd/", "run", 0, false);
+    });
+} catch(e) {
+    console.log("Eroare metoda 5: " + e);
+}
+
+// 6
+console.log("Se încearcă metoda 6: Paho.Client(host, port, path) cu useSSL, clientId gol");
+var client6 = new Paho.Client(host, port, path, "");
+client6.connect({
+    userName: user,
+    password: password,
+    useSSL: true,
+    onSuccess: function() {
+        console.log("Conectare reușită metoda 6");
+        var msg = new Paho.Message("test");
+        msg.destinationName = "/gosp/test/cmd/";
+        client6.send(msg);
+    },
+    onFailure: function(res) {
+        console.log("Eroare metoda 6: " + res.errorCode + " - " + res.errorMessage);
+    }
+});
+
+// 7
+console.log("Se încearcă metoda 7: Paho.Client(host, port) (3 argumente, fără path) cu useSSL, credențiale");
+var client7 = new Paho.Client(host, port, "test7"); // no path param
+client7.connect({
+    userName: user,
+    password: password,
+    useSSL: true,
+    onSuccess: function() {
+        console.log("Conectare reușită metoda 7");
+        var msg = new Paho.Message("test");
+        msg.destinationName = "/gosp/test/cmd/";
+        client7.send(msg);
+    },
+    onFailure: function(res) {
+        console.log("Eroare metoda 7: " + res.errorCode + " - " + res.errorMessage);
+    }
+});
+
+// 8
+console.log("Se încearcă metoda 8: Paho.Client(host, port) (3 argumente, fără path) FĂRĂ useSSL, credențiale");
+var client8 = new Paho.Client(host, port, "test8"); // no path param
+client8.connect({
+    userName: user,
+    password: password,
+    // no useSSL
+    onSuccess: function() {
+        console.log("Conectare reușită metoda 8");
+        var msg = new Paho.Message("test");
+        msg.destinationName = "/gosp/test/cmd/";
+        client8.send(msg);
+    },
+    onFailure: function(res) {
+        console.log("Eroare metoda 8: " + res.errorCode + " - " + res.errorMessage);
+    }
+});
+
+// 9
+console.log("Se încearcă metoda 9: Paho.Client(host, port, \"\" path gol) cu useSSL, credențiale");
+var client9 = new Paho.Client(host, port, "", "test9");
+client9.connect({
+    userName: user,
+    password: password,
+    useSSL: true,
+    onSuccess: function() {
+        console.log("Conectare reușită metoda 9");
+        var msg = new Paho.Message("test");
+        msg.destinationName = "/gosp/test/cmd/";
+        client9.send(msg);
+    },
+    onFailure: function(res) {
+        console.log("Eroare metoda 9: " + res.errorCode + " - " + res.errorMessage);
+    }
+});
+
+// 10
+console.log("Se încearcă metoda 10: Paho.Client(\"wss://host:8884\") (fără path în URL) cu credențiale");
+try {
+    var client10 = new Paho.Client("wss://" + host + ":" + port, "test10");
+    client10.connect({
+        userName: user,
+        password: password,
+        onSuccess: function() {
+            console.log("Conectare reușită metoda 10");
+            var msg = new Paho.Message("test");
+            msg.destinationName = "/gosp/test/cmd/";
+            client10.send(msg);
+        },
+        onFailure: function(res) {
+            console.log("Eroare metoda 10: " + res.errorCode + " - " + res.errorMessage);
         }
-      };
-      document.getElementById("rebootBtn").onclick = function() {
-        if (connected) {
-          client.send("/gosp/7821849F8900/cmd/", "reboot", 0, false);
+    });
+} catch(e) {
+    console.log("Eroare metoda 10: " + e);
+}
+
+// 11
+console.log("Se încearcă metoda 11: Paho.Client(\"wss://host:8884/\") (path rădăcină) cu credențiale");
+try {
+    var client11 = new Paho.Client("wss://" + host + ":" + port + "/", "test11");
+    client11.connect({
+        userName: user,
+        password: password,
+        onSuccess: function() {
+            console.log("Conectare reușită metoda 11");
+            var msg = new Paho.Message("test");
+            msg.destinationName = "/gosp/test/cmd/";
+            client11.send(msg);
+        },
+        onFailure: function(res) {
+            console.log("Eroare metoda 11: " + res.errorCode + " - " + res.errorMessage);
         }
-      };
-    };
-  </script>
+    });
+} catch(e) {
+    console.log("Eroare metoda 11: " + e);
+}
+
+// 12
+console.log("Se încearcă metoda 12: Paho.Client(\"wss://host:8884/mqtt\") cu credențiale");
+var client12 = new Paho.Client("wss://" + host + ":" + port + path, "test12");
+client12.connect({
+    userName: user,
+    password: password,
+    onSuccess: function() {
+        console.log("Conectare reușită metoda 12");
+        var msg = new Paho.Message("test");
+        msg.destinationName = "/gosp/test/cmd/";
+        client12.send(msg);
+    },
+    onFailure: function(res) {
+        console.log("Eroare metoda 12: " + res.errorCode + " - " + res.errorMessage);
+    }
+});
+
+// 13
+console.log("Se încearcă metoda 13: Paho.Client(\"wss://host:8884/mqtt\") FĂRĂ credențiale");
+var client13 = new Paho.Client("wss://" + host + ":" + port + path, "test13");
+client13.connect({
+    // no user/pass
+    onSuccess: function() {
+        console.log("Conectare reușită metoda 13");
+        var msg = new Paho.Message("test");
+        msg.destinationName = "/gosp/test/cmd/";
+        client13.send(msg);
+    },
+    onFailure: function(res) {
+        console.log("Eroare metoda 13: " + res.errorCode + " - " + res.errorMessage);
+    }
+});
+
+// 14
+console.log("Se încearcă metoda 14: Paho.MQTT.Client(host, port, path) cu useSSL, credențiale");
+try {
+    var client14 = new Paho.MQTT.Client(host, port, path, "test14");
+    client14.connect({
+        userName: user,
+        password: password,
+        useSSL: true,
+        onSuccess: function() {
+            console.log("Conectare reușită metoda 14");
+            var msg = new Paho.Message("test");
+            msg.destinationName = "/gosp/test/cmd/";
+            client14.send(msg);
+        },
+        onFailure: function(res) {
+            console.log("Eroare metoda 14: " + res.errorCode + " - " + res.errorMessage);
+        }
+    });
+} catch(e) {
+    console.log("Eroare metoda 14: " + e);
+}
+
+// 15
+console.log("Se încearcă metoda 15: Paho.MQTT.Client(\"wss://host:8884/mqtt\") cu credențiale");
+try {
+    var client15 = new Paho.MQTT.Client("wss://" + host + ":" + port + path, "test15");
+    client15.connect({
+        userName: user,
+        password: password,
+        onSuccess: function() {
+            console.log("Conectare reușită metoda 15");
+            var msg = new Paho.Message("test");
+            msg.destinationName = "/gosp/test/cmd/";
+            client15.send(msg);
+        },
+        onFailure: function(res) {
+            console.log("Eroare metoda 15: " + res.errorCode + " - " + res.errorMessage);
+        }
+    });
+} catch(e) {
+    console.log("Eroare metoda 15: " + e);
+}
+</script>
 </body>
 </html>
