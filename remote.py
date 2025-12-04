@@ -270,13 +270,14 @@ while True:
             )
         )
 
-    # DEBUGGING → fără deep sleep
+    # DEBUGGING → fără deep sleep, doar pauză scurtă
     if cfg["DEBUGGING"] == 1:
-        print("DEBUG → reluare 10 sec")
-        time.sleep(10)
+        print("DEBUG → reluare 10 sec (soft)")
+        for _ in range(10):
+            time.sleep(1)
         continue
 
-    # PRODUCȚIE
+    # PRODUCȚIE – folosim din nou deep sleep ca înainte (stabil)
     minutes = cfg.get("sleep_minutes", 5)
-    print("Sleep:", minutes, "minute (soft)")
-    time.sleep(10)
+    print("Sleep:", minutes, "minute (deep sleep)")
+    deepsleep(int(minutes * 60 * 1000))
