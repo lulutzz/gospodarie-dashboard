@@ -2,89 +2,104 @@
 <html lang="ro">
 <head>
   <meta charset="UTF-8" />
-  <title>Panou de control MQTT</title>
-  <!-- Include Paho MQTT JS from CDN -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>HiveMQ Cloud MQTT WebSocket Example</title>
+  <!-- Paho MQTT library (CDN) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/paho-mqtt.min.js"></script>
 </head>
 <body>
-  <h1>Panou de control pentru dispozitivul 7821849F8900</h1>
-  <p>Stare conexiune: <span id="statusIndicator">🔴 Deconectat</span></p>
-  <!-- Butoane pentru comenzi -->
-  <button id="pingBtn">Ping</button>
-  <button id="runBtn">Run</button>
-  <button id="rebootBtn">Reboot</button>
-  <!-- Zone de afișare a mesajelor MQTT -->
-  <h2>Mesaje status</h2>
-  <div id="statusLog"></div>
-  <h2>Mesaje log</h2>
-  <div id="logLog"></div>
+  <h1>HiveMQ Cloud MQTT WebSocket Example</h1>
+  <p>Stare conexiune: <span id="connectionStatus">Neconectat</span></p>
+  <div>
+    <button id="pingBtn" disabled>Trimite Ping</button>
+    <button id="runBtn" disabled>Trimite Run</button>
+    <button id="rebootBtn" disabled>Trimite Reboot</button>
+  </div>
+  <h2>Mesaje Status</h2>
+  <div id="statusMessages" style="border:1px solid #ccc; padding:5px; min-height:50px;"></div>
+  <h2>Mesaje Log</h2>
+  <div id="logMessages" style="border:1px solid #ccc; padding:5px; min-height:50px;"></div>
 
   <script>
-    // 1. Inițializare client MQTT și conectare la HiveMQ Cloud
-    const clientId = "mqtt_web_" + Math.floor(Math.random() * 1000000);  // ID unic
-    const client = new Paho.MQTT.Client(
-      "wss://c72cc38c1f184d0199cc4daa938bac6f.s1.eu.hivemq.cloud:8884/mqtt",
-      clientId
-    );
+    window.onload = function() {
+      // Detalii broker HiveMQ Cloud
+      var host = "NUME-CLUSTER.s2.eu.hivemq.cloud";  // ← înlocuiește cu URL-ul clusterului tău
+      var port = 8884;
+      var path = "/mqtt";
+      var clientId = "web_" + Math.floor(Math.random() * 10000);
 
-    // 2. Actualizarea indicatorului de status
-    function updateStatusIndicator(connected) {
-      const statusEl = document.getElementById('statusIndicator');
-      statusEl.textContent = connected ? "🟢 Conectat" : "🔴 Deconectat";
-    }
+      // Creare instanță client MQTT (WebSocket TLS)
+      var client = new Paho.Client(host, port, path, clientId);
 
-    // Callback: conexiune pierdută
-    client.onConnectionLost = function(responseObject) {
-      if (responseObject.errorCode !== 0) {
-        console.error("Conexiune pierdută: " + responseObject.errorMessage);
+      // Flag stare conexiune
+      var connected = false;
+
+      // Callback: conexiune pierdută
+      client.onConnectionLost = function(responseObject) {
+        document.getElementById("connectionStatus").innerText = "Conexiune pierdută";
+        // Dezactivăm butoanele de comandă
+        document.getElementById("pingBtn").disabled = true;
+        document.getElementById("runBtn").disabled = true;
+        document.getElementById("rebootBtn").disabled = true;
+        if (responseObject.errorMessage) {
+          console.log("Connection lost: " + responseObject.errorMessage);
+        }
+      };
+
+      // Callback: mesaj sosit pe un topic
+      client.onMessageArrived = function(message) {
+        var topic = message.destinationName;
+        var payload = message.payloadString;
+        if (topic === "/status") {
+          document.getElementById("statusMessages").innerHTML += payload + "<br/>";
+        } else if (topic === "/log") {
+          document.getElementById("logMessages").innerHTML += payload + "<br/>";
+        }
+        console.log("Mesaj primit pe " + topic + ": " + payload);
+      };
+
+      // Funcție apelată la conectare reușită
+      function onConnect() {
+        connected = true;
+        document.getElementById("connectionStatus").innerText = "Conectat";
+        // Activăm butoanele de comandă acum că suntem conectați
+        document.getElementById("pingBtn").disabled = false;
+        document.getElementById("runBtn").disabled = false;
+        document.getElementById("rebootBtn").disabled = false;
+        console.log("Conexiune MQTT stabilită cu brokerul.");
+        // Ne abonăm la topicurile /status și /log
+        client.subscribe("/status");
+        client.subscribe("/log");
       }
-      updateStatusIndicator(false);  // marcat ca deconectat
-    };
 
-    // Callback: mesaj sosit
-    client.onMessageArrived = function(message) {
-      const topic = message.destinationName;
-      const payload = message.payloadString;
-      if (topic === "/gosp/7821849F8900/status") {
-        document.getElementById('statusLog').innerHTML += payload + "<br>";
-      } else if (topic === "/gosp/7821849F8900/log") {
-        document.getElementById('logLog').innerHTML += payload + "<br>";
-      }
-    };
+      // Conectare la broker cu credențiale și TLS
+      client.connect({
+        useSSL: true,
+        userName: "burlusi",
+        password: "Burlusi166?",
+        onSuccess: onConnect,
+        onFailure: function(err) {
+          document.getElementById("connectionStatus").innerText = "Eșec conectare";
+          console.error("Connect failed: " + (err.errorMessage || err));
+        }
+      });
 
-    // Conectare la broker cu credentiale
-    client.connect({
-      useSSL: true,
-      userName: "burlusi",
-      password: "Burlusi166?",
-      onSuccess: function() {
-        console.log("Conectat la broker.");
-        updateStatusIndicator(true);
-        // 3. Abonare la topicurile de status și log după conectare
-        client.subscribe("/gosp/7821849F8900/status");
-        client.subscribe("/gosp/7821849F8900/log");
-      },
-      onFailure: function(error) {
-        console.error("Eroare la conectare: " + error.errorMessage);
-        updateStatusIndicator(false);
-      }
-    });
-
-    // 4. Trimiterea comenzilor MQTT la apăsarea butoanelor
-    document.getElementById('pingBtn').onclick = function() {
-      const msg = new Paho.MQTT.Message("");
-      msg.destinationName = "/gosp/7821849F8900/cmd/ping";
-      client.send(msg);
-    };
-    document.getElementById('runBtn').onclick = function() {
-      const msg = new Paho.MQTT.Message("");
-      msg.destinationName = "/gosp/7821849F8900/cmd/run";
-      client.send(msg);
-    };
-    document.getElementById('rebootBtn').onclick = function() {
-      const msg = new Paho.MQTT.Message("");
-      msg.destinationName = "/gosp/7821849F8900/cmd/reboot";
-      client.send(msg);
+      // Event handlers pentru butoane – trimit comenzi la topicul de comandă
+      document.getElementById("pingBtn").onclick = function() {
+        if (connected) {
+          client.send("/gosp/7821849F8900/cmd/", "ping", 0, false);
+        }
+      };
+      document.getElementById("runBtn").onclick = function() {
+        if (connected) {
+          client.send("/gosp/7821849F8900/cmd/", "run", 0, false);
+        }
+      };
+      document.getElementById("rebootBtn").onclick = function() {
+        if (connected) {
+          client.send("/gosp/7821849F8900/cmd/", "reboot", 0, false);
+        }
+      };
     };
   </script>
 </body>
