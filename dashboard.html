@@ -70,7 +70,7 @@
     <div id="deviceList"></div>
   </div>
   <div class="main">
-    <h1>Panou Control Gospodărie</h1>
+    <h1>Panou Control Gospodărie2</h1>
     <p>Status live & comenzi prin MQTT – HiveMQ Cloud</p>
   </div>
 
@@ -93,24 +93,35 @@ window.addEventListener("load", function () {
   const client = new Paho.Client(host, port, path, clientId);
   client.onConnectionLost = err => console.warn("Conexiune pierdută", err);
   client.onMessageArrived = msg => {
-    const topic = msg.destinationName;
+    const topic   = msg.destinationName;
     const payload = msg.payloadString;
-    const parts = topic.split("/");
+    const parts   = topic.split("/");
+  
+    // Ne asigurăm că arată ca home/<ID>/<ceva>
     if (parts.length < 3) return;
-    const deviceID = parts[1];
-    const subtopic = parts.slice(2).join("/");
-
-    if (!devices[deviceID]) createDeviceCard(deviceID);
-
+    if (parts[0] !== "home") return;
+  
+    const deviceID = parts[1];      // ex: 7821849F8900
+    if (!deviceID) return;          // ignoră home//status
+  
+    const subtopic = parts.slice(2).join("/"); // ex: "status" sau "sensors"
+  
+    if (!devices[deviceID]) {
+      createDeviceCard(deviceID);
+    }
+  
     if (subtopic === "status") {
       updateStatus(deviceID, payload);
     } else if (subtopic === "sensors") {
       try {
         const data = JSON.parse(payload);
         updateSensor(deviceID, data);
-      } catch(e) {}
+      } catch (e) {
+        console.error("Eroare parsare sensors:", e);
+      }
     }
   };
+
 
   function connectMQTT() {
     client.connect({
