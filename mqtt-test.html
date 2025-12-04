@@ -1,0 +1,23 @@
+<script src="https://unpkg.com/paho-mqtt/mqttws31.min.js"></script>
+<script>
+const HOST = "c72cc38c1f184d0199cc4daa938bac6f.s1.eu.hivemq.cloud";
+const PORT = 8884;
+const PATH = "/mqtt";
+const USER = "burlusi";
+const PASS = "Burlusi166?";
+
+let clientId = "TEST_" + Math.random().toString(16).substr(2,6);
+
+let client = new Paho.MQTT.Client(HOST, PORT, PATH, clientId);
+
+client.onConnectionLost = () => console.log("CONNECTION LOST");
+client.onMessageArrived = msg => console.log("MSG:", msg.destinationName, msg.payloadString);
+
+client.connect({
+    useSSL: true,
+    userName: USER,
+    password: PASS,
+    onSuccess: () => console.log("CONNECTED OK"),
+    onFailure: e => console.error("CONNECT FAIL:", e)
+});
+</script>
