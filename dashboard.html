@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <title>Dashboard ESP32 – Gospodărie</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <!--<script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/paho-mqtt.min.js"></script>-->
   <script src="https://unpkg.com/paho-mqtt/mqttws31.min.js"></script>
   <style>
     :root {
@@ -75,6 +74,7 @@
   </div>
 
 <script>
+window.addEventListener("load", function () {
   const deviceList = document.getElementById('deviceList');
   const devices = {}; // ID → state
 
@@ -85,7 +85,7 @@
   const mqttUser = "burlusi";
   const mqttPass = "Burlusi166?";
 
-  new Paho.MQTT.Client(host, port, path, clientId)
+  const client = new Paho.MQTT.Client(mqttHost, mqttPort, mqttPath, clientId);
 
   client.onConnectionLost = err => console.warn("Conexiune pierdută", err);
   client.onMessageArrived = msg => {
@@ -164,6 +164,7 @@
   }
 
   connectMQTT();
+});
 </script>
 </body>
 </html>
