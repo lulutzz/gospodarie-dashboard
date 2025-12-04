@@ -1,21 +1,20 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
-    <title>MQTT TEST</title>
+<meta charset="UTF-8">
+<title>MQTT Test</title>
 
-    <!-- Biblioteca MQTT funcțională -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/mqttws31.min.js"></script>
+<!-- 🔥 Biblioteca MQTT – obligatoriu prima! -->
+<script src="https://unpkg.com/paho-mqtt/mqttws31.min.js"></script>
 
 </head>
-<body style="background:black;color:#0f0;font-family:monospace">
-
+<body style="background:black;color:#0f0;font-family:monospace;padding:20px">
 <h2>MQTT Test</h2>
-<pre id="log"></pre>
+<pre id="log">Loading MQTT...</pre>
 
 <script>
-function log(txt){
-    document.getElementById("log").textContent += txt + "\n";
+function log(msg){
+    document.getElementById("log").textContent += "\n" + msg;
 }
 
 const HOST = "c72cc38c1f184d0199cc4daa938bac6f.s1.eu.hivemq.cloud";
@@ -23,27 +22,35 @@ const PORT = 8884;
 const PATH = "/mqtt";
 const USER = "burlusi";
 const PASS = "Burlusi166?";
-const ID   = "WEB_TEST_" + Math.random().toString(16).substr(2,6);
+const clientId = "WEBTEST_" + Math.random().toString(16).substr(2,8);
 
-log("Loading MQTT...");
+log("Connecting...");
 
-let client = new Paho.MQTT.Client(HOST, PORT, PATH, ID);
+let client = new Paho.MQTT.Client(HOST, PORT, PATH, clientId);
 
-client.onConnectionLost = () => log("!! Connection lost");
-client.onMessageArrived = (msg) => log("MSG: " + msg.destinationName + " = " + msg.payloadString);
+client.onConnectionLost = (r)=>{
+    log("Connection lost: " + r.errorMessage);
+};
+
+client.onMessageArrived = (m)=>{
+    log("MSG: " + m.destinationName + " = " + m.payloadString);
+};
 
 client.connect({
     useSSL: true,
     userName: USER,
     password: PASS,
-    cleanSession: true,
     timeout: 5,
-    onSuccess: () => {
-        log("✔ CONNECTED");
+    cleanSession: true,
+    onSuccess: ()=>{
+        log("Connected!");
         client.subscribe("/gosp/+/status");
-        log("Subscribed");
+        client.subscribe("/gosp/+/log");
+        log("Subscribed!");
     },
-    onFailure: (e) => log("ERR: " + e.errorMessage)
+    onFailure: (e)=>{
+        log("Connect ERROR: " + e.errorMessage);
+    }
 });
 </script>
 
