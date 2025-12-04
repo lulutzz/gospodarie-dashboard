@@ -161,9 +161,10 @@ window.addEventListener("load", function () {
   }
   window.sendCmd = function(id, cmd) {
     const topic = `home/${id}/cmd/${cmd}`;
-    const msg = new Paho.MQTT.Message("");
+    const msg = new Paho.Message("");   // ← AICI e schimbarea importantă
     msg.destinationName = topic;
     client.send(msg);
+    console.log("Trimis comanda", cmd, "către", topic);
   }
   connectMQTT();
 });
