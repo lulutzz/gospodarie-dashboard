@@ -85,7 +85,7 @@
   const mqttUser = "burlusi";
   const mqttPass = "Burlusi166?";
 
-  const client = new Paho.MQTT.Client(mqttHost, mqttPort, mqttPath, clientId);
+  new Paho.MQTT.Client(host, port, path, clientId)
 
   client.onConnectionLost = err => console.warn("Conexiune pierdută", err);
   client.onMessageArrived = msg => {
