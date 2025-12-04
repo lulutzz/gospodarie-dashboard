@@ -103,7 +103,7 @@ window.addEventListener("load", function () {
   
     const deviceID = parts[1];      // ex: 7821849F8900
     if (!deviceID) return;          // ignoră home//status
-  
+
     const subtopic = parts.slice(2).join("/"); // ex: "status" sau "sensors"
   
     if (!devices[deviceID]) {
@@ -119,6 +119,8 @@ window.addEventListener("load", function () {
       } catch (e) {
         console.error("Eroare parsare sensors:", e);
       }
+    } else if (subtopic === "log") {
+      updateLog(deviceID, payload);  
     }
   };
 
@@ -132,6 +134,8 @@ window.addEventListener("load", function () {
         console.log("✔ Conectat la broker MQTT");
         client.subscribe("home/+/status");
         client.subscribe("home/+/sensors");
+        client.subscribe("home/+/log"); 
+
       },
       onFailure: err => console.error("❌ Eroare conectare MQTT", err)
     });
@@ -148,6 +152,7 @@ window.addEventListener("load", function () {
       </div>
       <div class="device-body">
         <div id="data-${id}">...</div>
+        <div id="log-${id}" style="font-size:0.75rem;color:var(--muted);margin-top:4px;">&nbsp;</div>
         <div class="controls">
           <button onclick="sendCmd('${id}', 'ping')">Ping</button>
           <button onclick="sendCmd('${id}', 'reboot')">Reboot</button>
@@ -158,6 +163,7 @@ window.addEventListener("load", function () {
     deviceList.appendChild(el);
     devices[id] = true;
   }
+
 
   function updateStatus(id, payload) {
     const dot = document.getElementById(`status-${id}`);
