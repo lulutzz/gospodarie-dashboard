@@ -70,7 +70,7 @@
     <div id="deviceList"></div>
   </div>
   <div class="main">
-    <h1>Panou Control Gospodărie2</h1>
+    <h1>Panou Control Gospodărie</h1>
     <p>Status live & comenzi prin MQTT – HiveMQ Cloud</p>
   </div>
 
@@ -163,7 +163,11 @@ window.addEventListener("load", function () {
     deviceList.appendChild(el);
     devices[id] = true;
   }
-
+  function updateLog(id, msg) {
+    const el = document.getElementById(`log-${id}`);
+    if (!el) return;
+    el.textContent = msg;
+  }
 
   function updateStatus(id, payload) {
     const dot = document.getElementById(`status-${id}`);
