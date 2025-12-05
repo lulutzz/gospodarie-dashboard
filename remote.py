@@ -147,7 +147,8 @@ def connect_wifi():
 # ============================================================
 
 def fetch_config():
-    url = "https://api.thingspeak.com/channels/{}/feeds.json?results=1".format(
+    # luăm mai multe înregistrări ca să putem căuta ultima valoare nenulă
+    url = "https://api.thingspeak.com/channels/{}/feeds.json?results=20".format(
         CONFIG_CHANNEL
     )
     print("Citire CONFIG din:", url)
@@ -161,32 +162,34 @@ def fetch_config():
         if not feeds:
             raise ValueError("CONFIG gol")
 
-        last = feeds[-1]
-
-        def read_int(field, default):
-            v = last.get(field)
-            if v is None or v == "":
-                return default
-            try:
-                return int(float(v))
-            except:
-                return default
+        # helper: caută de la sfârșit spre început ultimul field nenul
+        def last_non_empty_int(field, default):
+            for f in reversed(feeds):
+                v = f.get(field)
+                if v is None or v == "":
+                    continue
+                try:
+                    return int(float(v))
+                except:
+                    return default
+            return default
 
         cfg = {}
-        # globale
-        cfg["sleep_minutes"] = read_int("field1", 30)
-        cfg["DEBUGGING"]     = read_int("field8", 1)
 
-        # specifice device-ului curent
+        # ---------- valori globale ----------
+        cfg["sleep_minutes"] = last_non_empty_int("field1", 30)
+        cfg["DEBUGGING"]     = last_non_empty_int("field8", 1)
+
+        # ---------- praguri specifice device-ului ----------
         info = INFO or {}
         cfg_fields = info.get("config_fields", {})
         print("cfg_fields pentru", ROOM, ":", cfg_fields)
 
-        temp_field = cfg_fields.get("alarm_temp", "field2")
-        hum_field  = cfg_fields.get("alarm_hum",  "field3")
+        temp_field = cfg_fields.get("alarm_temp", "field2")  # ex: 'field6' la Bucatarie
+        hum_field  = cfg_fields.get("alarm_hum",  "field3")  # ex: 'field7' la Bucatarie
 
-        cfg["alarm_temp"] = read_int(temp_field, 25)
-        cfg["alarm_hum"]  = read_int(hum_field, 60)
+        cfg["alarm_temp"] = last_non_empty_int(temp_field, 25)
+        cfg["alarm_hum"]  = last_non_empty_int(hum_field, 60)
 
         print("SETARI:", cfg)
         return cfg
