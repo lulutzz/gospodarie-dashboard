@@ -2,222 +2,677 @@
 <html lang="ro">
 <head>
   <meta charset="UTF-8">
-  <title>Dashboard ESP32 – Gospodărie</title>
+  <title>Gospodărie – Dashboard & Config</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Paho MQTT – NU MODIFICĂM -->
   <!--<script src="https://unpkg.com/paho-mqtt/mqttws31.min.js"></script>-->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/paho-mqtt.min.js"></script>
+
   <style>
     :root {
       --bg: #0f172a;
-      --card-bg: #1e293b;
+      --card-bg: #111827;
       --accent: #38bdf8;
+      --accent2: #22c55e;
+      --accent3: #f97316;
       --danger: #ef4444;
       --success: #22c55e;
-      --text: #f1f5f9;
-      --muted: #94a3b8;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
     }
+
     * { box-sizing: border-box; }
+
     body {
-      margin: 0; padding: 0;
-      font-family: system-ui, sans-serif;
-      background: var(--bg);
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #1f2937 0, #020617 55%, #000 100%);
       color: var(--text);
-      display: flex; height: 100vh;
+      display: flex;
+      min-height: 100vh;
     }
+
+    /* SIDEBAR DISPOZITIVE */
+
     .sidebar {
-      width: 280px; background: #1e293b;
-      border-right: 1px solid rgba(255,255,255,0.05);
-      padding: 16px; overflow-y: auto;
-    }
-    .main {
-      flex: 1; padding: 20px;
+      width: 280px;
+      background: #020617;
+      border-right: 1px solid rgba(148,163,184,0.25);
+      padding: 16px;
       overflow-y: auto;
     }
+
+    .sidebar h2 {
+      margin: 0 0 10px;
+      font-size: 1.1rem;
+    }
+
+    /* ZONA PRINCIPALĂ */
+
+    .main {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+    }
+
+    .main-header {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .main-header h1 {
+      margin: 0;
+      font-size: 1.5rem;
+    }
+
+    .main-header .subtitle {
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .badge-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+      font-size: 0.75rem;
+    }
+
+    .badge {
+      padding: 3px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(148,163,184,0.4);
+      color: var(--muted);
+    }
+
+    .badge-mqtt { border-color: rgba(56,189,248,0.7); color: var(--accent); }
+    .badge-ts   { border-color: rgba(34,197,94,0.7);  color: var(--accent2); }
+
+    /* CARD DISPOZITIV (sidebar) */
+
     .device-card {
-      background: var(--card-bg);
-      border: 1px solid rgba(255,255,255,0.07);
+      background: #020617;
+      border: 1px solid rgba(148,163,184,0.35);
       border-radius: 12px;
-      padding: 14px; margin-bottom: 16px;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+      padding: 12px;
+      margin-bottom: 12px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.35);
     }
+
     .device-header {
-      display: flex; justify-content: space-between;
-      align-items: center; margin-bottom: 10px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
     }
+
     .device-id {
-      font-weight: bold; font-size: 1rem;
+      font-weight: 600;
+      font-size: 0.95rem;
     }
+
     .status-dot {
-      width: 10px; height: 10px;
-      border-radius: 999px; display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      display: inline-block;
     }
+
     .online { background: var(--success); }
     .offline { background: var(--danger); }
+
     .device-body {
-      font-size: 0.9rem;
+      font-size: 0.85rem;
     }
+
+    .controls {
+      margin-top: 6px;
+    }
+
     .controls button {
-      background: var(--accent); border: none;
-      padding: 6px 10px; border-radius: 8px;
-      margin-right: 6px; cursor: pointer;
+      background: var(--accent);
+      border: none;
+      padding: 5px 9px;
+      border-radius: 8px;
+      margin-right: 6px;
+      margin-top: 4px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 500;
     }
-    .controls button:hover { filter: brightness(1.1); }
-      .log-panel {
-    margin-top: 16px;
-    background: #020617;
-    border-radius: 12px;
-    border: 1px solid rgba(148,163,184,0.35);
-    padding: 10px 12px;
-    max-height: 260px;
-    overflow-y: auto;
-    font-size: 0.85rem;
-  }
-  .log-panel div {
-    padding: 2px 0;
-  }
+
+    .controls button:hover {
+      filter: brightness(1.1);
+    }
+
+    /* LOG GLOBAL */
+
+    .log-panel {
+      margin-top: 8px;
+      background: #020617;
+      border-radius: 12px;
+      border: 1px solid rgba(148,163,184,0.35);
+      padding: 10px 12px;
+      max-height: 260px;
+      overflow-y: auto;
+      font-size: 0.85rem;
+    }
+
+    .log-panel div {
+      padding: 2px 0;
+    }
+
+    /* GRID + CARDURI CONFIG (din control.html) */
+
+    .section-title {
+      margin-top: 18px;
+      margin-bottom: 4px;
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .section-subtitle {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .grid {
+        display: grid;
+        gap: 16px;
+        max-width: 980px;
+        margin: 0 auto;
+    }
+
+    @media (min-width: 768px) {
+        .grid-2 {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+        .grid-3 {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+    }
+
+    .card {
+        background: linear-gradient(135deg, rgba(15,23,42,0.95), rgba(15,23,42,0.8));
+        border-radius: 14px;
+        padding: 14px 14px 12px;
+        box-shadow: 0 18px 40px rgba(0,0,0,0.5);
+        border: 1px solid rgba(148,163,184,0.15);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .card::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(circle at top left, rgba(56,189,248,0.12), transparent 55%);
+        opacity: 0.7;
+        pointer-events: none;
+    }
+
+    .card-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 8px;
+        position: relative;
+        z-index: 1;
+    }
+
+    .card-title {
+        font-size: 1.05rem;
+        font-weight: 600;
+    }
+
+    .tag {
+        font-size: 0.75rem;
+        padding: 3px 8px;
+        border-radius: 999px;
+        border: 1px solid rgba(148,163,184,0.4);
+        color: var(--muted);
+        backdrop-filter: blur(6px);
+    }
+
+    .tag-global { border-color: rgba(56,189,248,0.8); color: var(--accent); }
+    .tag-room   { border-color: rgba(34,197,94,0.7);  color: var(--accent2); }
+
+    .row {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 6px;
+        position: relative;
+        z-index: 1;
+    }
+
+    .field {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    label {
+        font-size: 0.8rem;
+        color: var(--muted);
+    }
+
+    input, select {
+        border-radius: 8px;
+        border: 1px solid rgba(148,163,184,0.35);
+        background: rgba(15,23,42,0.9);
+        color: var(--text);
+        padding: 6px 8px;
+        font-size: 0.9rem;
+        outline: none;
+    }
+
+    input:focus, select:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 1px rgba(56,189,248,0.3);
+    }
+
+    button.btn-primary {
+        border-radius: 999px;
+        border: none;
+        padding: 8px 10px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        margin-top: 4px;
+        background: linear-gradient(135deg, #0ea5e9, #22c55e);
+        color: #0b1120;
+    }
+
+    button.btn-primary:hover {
+        filter: brightness(1.05);
+    }
+
+    .status {
+        margin-top: 6px;
+        font-size: 0.75rem;
+        min-height: 16px;
+        color: var(--muted);
+        position: relative;
+        z-index: 1;
+    }
+
+    .status.ok { color: #4ade80; }
+    .status.err { color: #f97373; }
+
+    .footer {
+        max-width: 960px;
+        margin: 14px auto 0;
+        font-size: 0.7rem;
+        text-align: center;
+        color: var(--muted);
+    }
+
+    a {
+        color: var(--accent);
+        text-decoration: none;
+    }
   </style>
 </head>
 <body>
+
+  <!-- SIDEBAR: dispozitive ESP32 -->
   <div class="sidebar">
     <h2>Dispozitive ESP32</h2>
     <div id="deviceList"></div>
   </div>
+
+  <!-- MAIN: MQTT + LOG + CONFIG ThingSpeak -->
   <div class="main">
-    <h1>Panou Control Gospodăriee</h1>
-    <p>Status live & comenzi prin MQTT – HiveMQ Cloud</p>
-  
+
+    <div class="main-header">
+      <div>
+        <h1>Panou Gospodărie</h1>
+        <div class="subtitle">Status live & comenzi prin MQTT · Config prin ThingSpeak</div>
+      </div>
+      <div class="badge-row">
+        <span class="badge badge-mqtt">MQTT – HiveMQ Cloud</span>
+        <span class="badge badge-ts">CONFIG – ThingSpeak (canal 1622205)</span>
+      </div>
+    </div>
+
+    <!-- LOG GLOBAL MQTT -->
     <div id="globalLog" class="log-panel">
       <div style="opacity:0.6;font-size:0.85rem;">
         Aici vor apărea ultimele mesaje de la dispozitive (log, erori senzori, ping etc.).
       </div>
     </div>
-  </div>
 
-<script>
-window.addEventListener("load", function () {
-  const deviceList = document.getElementById('deviceList');
-  const devices = {}; // ID → state
-  const globalLog = document.getElementById('globalLog');
-  
-  function appendGlobalLog(text) {
-    if (!globalLog) return;
-    const line = document.createElement('div');
-    const now  = new Date().toLocaleTimeString();
-    line.textContent = `${now} · ${text}`;
-    globalLog.prepend(line);   // ultimele mesaje sus
-  }
+    <!-- SECȚIUNE CONFIG THINGSPEAK -->
+    <div class="section-title">Configurare senzori</div>
+    <div class="section-subtitle">
+      Panoul de mai jos trimite comenzi către ThingSpeak (CONFIG – Gospodărie, ID: 1622205), iar ESP32 citește aceste valori la următorul ciclu.
+    </div>
 
-  const mqttHost = "c72cc38c1f184d0199cc4daa938bac6f.s1.eu.hivemq.cloud";
-  const mqttPort = 8884;
-  const mqttPath = "/mqtt";
-  const mqttUser = "burlusi";
-  const mqttPass = "Burlusi166?";
-  // CONFIG MQTT
-  const host = "c72cc38c1f184d0199cc4daa938bac6f.s1.eu.hivemq.cloud";
-  const port = 8884;              // WebSocket TLS
-  const path = "/mqtt";           // default HiveMQ WS path
-  const clientId = "webclient_" + Math.random().toString(16).substr(2, 8);
+    <div class="grid grid-2">
 
-  const client = new Paho.Client(host, port, path, clientId);
-  client.onConnectionLost = err => console.warn("Conexiune pierdută", err);
-  client.onMessageArrived = msg => {
-    const topic   = msg.destinationName;
-    const payload = msg.payloadString;
-    const parts   = topic.split("/");
-  
-    // Ne asigurăm că arată ca home/<ID>/<ceva>
-    if (parts.length < 3) return;
-    if (parts[0] !== "home") return;
-  
-    const deviceID = parts[1];      // ex: 7821849F8900
-    if (!deviceID) return;          // ignoră home//status
+      <!-- GLOBAL -->
+      <div class="card">
+          <div class="card-header">
+              <div class="card-title">Setări globale</div>
+              <span class="tag tag-global">Global</span>
+          </div>
 
-    const subtopic = parts.slice(2).join("/"); // ex: "status" sau "sensors"
-  
-    if (!devices[deviceID]) {
-      createDeviceCard(deviceID);
+          <div class="row">
+              <div class="field">
+                  <label for="sleep_minutes">Sleep (minute) – field1</label>
+                  <input id="sleep_minutes" type="number" min="1" max="180" placeholder="ex: 30">
+              </div>
+              <div class="field">
+                  <label for="debug">DEBUGGING – field8</label>
+                  <select id="debug">
+                      <option value="">(nu modific)</option>
+                      <option value="1">1 – DEBUG ON (fără sleep)</option>
+                      <option value="0">0 – PROD (cu sleep)</option>
+                  </select>
+              </div>
+          </div>
+
+          <button class="btn-primary" onclick="
+              const sleepVal = document.getElementById('sleep_minutes').value;
+              const debugVal = document.getElementById('debug').value;
+              const fields = {};
+              if (sleepVal !== '') fields['field1'] = Number(sleepVal);
+              if (debugVal !== '') fields['field8'] = Number(debugVal);
+              sendConfig(fields, 'status-global');
+          ">
+              💾 Salvează globale
+          </button>
+          <div id="status-global" class="status"></div>
+      </div>
+
+      <!-- CAMARA -->
+      <div class="card">
+          <div class="card-header">
+              <div class="card-title">Cămară (EC62609C8900)</div>
+              <span class="tag tag-room">Camara · fields 2–3</span>
+          </div>
+
+          <div class="row">
+              <div class="field">
+                  <label for="camara_temp">Prag temperatură (°C) – field2</label>
+                  <input id="camara_temp" type="number" step="0.1" placeholder="ex: 25">
+              </div>
+              <div class="field">
+                  <label for="camara_hum">Prag umiditate (%) – field3</label>
+                  <input id="camara_hum" type="number" step="1" placeholder="ex: 60">
+              </div>
+          </div>
+
+          <button class="btn-primary" onclick="
+              const t = document.getElementById('camara_temp').value;
+              const h = document.getElementById('camara_hum').value;
+              const fields = {};
+              if (t !== '') fields['field2'] = Number(t);
+              if (h !== '') fields['field3'] = Number(h);
+              sendConfig(fields, 'status-camara');
+          ">
+              💾 Salvează Cămară
+          </button>
+          <div id="status-camara" class="status"></div>
+      </div>
+
+    </div>
+
+    <div class="grid grid-2" style="margin-top:10px;">
+
+      <!-- BAIE -->
+      <div class="card">
+          <div class="card-header">
+              <div class="card-title">Baie</div>
+              <span class="tag tag-room">Baie · fields 4–5</span>
+          </div>
+
+          <div class="row">
+              <div class="field">
+                  <label for="baie_temp">Prag temperatură (°C) – field4</label>
+                  <input id="baie_temp" type="number" step="0.1" placeholder="ex: 28">
+              </div>
+              <div class="field">
+                  <label for="baie_hum">Prag umiditate (%) – field5</label>
+                  <input id="baie_hum" type="number" step="1" placeholder="ex: 75">
+              </div>
+          </div>
+
+          <button class="btn-primary" onclick="
+              const t = document.getElementById('baie_temp').value;
+              const h = document.getElementById('baie_hum').value;
+              const fields = {};
+              if (t !== '') fields['field4'] = Number(t);
+              if (h !== '') fields['field5'] = Number(h);
+              sendConfig(fields, 'status-baie');
+          ">
+              💾 Salvează Baie
+          </button>
+          <div id="status-baie" class="status"></div>
+      </div>
+
+      <!-- BUCATARIE -->
+      <div class="card">
+          <div class="card-header">
+              <div class="card-title">Bucătărie (7821849F8900)</div>
+              <span class="tag tag-room">Bucătărie · fields 6–7</span>
+          </div>
+
+          <div class="row">
+              <div class="field">
+                  <label for="buc_temp">Prag temperatură (°C) – field6</label>
+                  <input id="buc_temp" type="number" step="0.1" placeholder="ex: 27">
+              </div>
+              <div class="field">
+                  <label for="buc_hum">Prag umiditate (%) – field7</label>
+                  <input id="buc_hum" type="number" step="1" placeholder="ex: 70">
+              </div>
+          </div>
+
+          <button class="btn-primary" onclick="
+              const t = document.getElementById('buc_temp').value;
+              const h = document.getElementById('buc_hum').value;
+              const fields = {};
+              if (t !== '') fields['field6'] = Number(t);
+              if (h !== '') fields['field7'] = Number(h);
+              sendConfig(fields, 'status-buc');
+          ">
+              💾 Salvează Bucătărie
+          </button>
+          <div id="status-buc" class="status"></div>
+      </div>
+
+    </div>
+
+    <div class="footer">
+        Panoul trimite direct comenzi către ThingSpeak prin API-ul <code>update</code>.<br>
+        După salvare, valorile apar în canalul <strong>CONFIG – Gospodărie (1622205)</strong>, iar ESP32 le va citi la următorul ciclu.
+    </div>
+
+  </div> <!-- end .main -->
+
+  <!-- SCRIPT COMUN: ThingSpeak + MQTT -->
+  <script>
+    /* ====================== THINGSPEAK CONFIG ====================== */
+
+    const API_KEY = "L7AUPY13P0E0KJV9";
+    const BASE_URL = "https://api.thingspeak.com/update";
+
+    async function sendConfig(fields, statusId) {
+        const statusEl = document.getElementById(statusId);
+        statusEl.textContent = "Trimit configurarea...";
+        statusEl.className = "status";
+
+        let payload = "api_key=" + API_KEY;
+
+        Object.entries(fields).forEach(([f, v]) => {
+            if (v !== "" && v != null && !Number.isNaN(v)) {
+                payload += `&${f}=${encodeURIComponent(v)}`;
+            }
+        });
+
+        try {
+            const response = await fetch(BASE_URL, {
+                method: "POST",
+                headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                body: payload
+            });
+
+            const text = await response.text();
+
+            if (parseInt(text) > 0) {
+                statusEl.textContent = "✔ Config trimisă (entry " + text + ")";
+                statusEl.className = "status ok";
+            } else {
+                statusEl.textContent = "❌ Eroare ThingSpeak (" + text + ")";
+                statusEl.className = "status err";
+            }
+
+        } catch (err) {
+            statusEl.textContent = "❌ Eroare: " + err;
+            statusEl.className = "status err";
+        }
     }
-  
-    if (subtopic === "status") {
-      updateStatus(deviceID, payload);
-    } else if (subtopic === "sensors") {
-      try {
-        const data = JSON.parse(payload);
-        updateSensor(deviceID, data);
-      } catch (e) {
-        console.error("Eroare parsare sensors:", e);
+
+    /* ====================== MQTT DASHBOARD ====================== */
+
+    window.addEventListener("load", function () {
+      const deviceList = document.getElementById('deviceList');
+      const devices = {}; // ID → state
+      const globalLog = document.getElementById('globalLog');
+
+      function appendGlobalLog(text) {
+        if (!globalLog) return;
+        const line = document.createElement('div');
+        const now  = new Date().toLocaleTimeString();
+        line.textContent = `${now} · ${text}`;
+        globalLog.prepend(line);   // ultimele mesaje sus
       }
-    } else if (subtopic === "log") {
-      updateLog(deviceID, payload);  
-    }
-  };
 
+      // CONFIG MQTT – NEATINS
+      const host = "c72cc38c1f184d0199cc4daa938bac6f.s1.eu.hivemq.cloud";
+      const port = 8884;              // WebSocket TLS
+      const path = "/mqtt";           // default HiveMQ WS path
+      const mqttUser = "burlusi";
+      const mqttPass = "Burlusi166?";
+      const clientId = "webclient_" + Math.random().toString(16).substr(2, 8);
 
-  function connectMQTT() {
-    client.connect({
-      useSSL: true,
-      userName: mqttUser,
-      password: mqttPass,
-      onSuccess: () => {
-        console.log("✔ Conectat la broker MQTT");
-        client.subscribe("home/+/status");
-        client.subscribe("home/+/sensors");
-        client.subscribe("home/+/log"); 
+      const client = new Paho.Client(host, port, path, clientId);
 
-      },
-      onFailure: err => console.error("❌ Eroare conectare MQTT", err)
+      client.onConnectionLost = err => console.warn("Conexiune pierdută", err);
+      client.onMessageArrived = msg => {
+        const topic   = msg.destinationName;
+        const payload = msg.payloadString;
+        const parts   = topic.split("/");
+
+        // așteptăm home/<ID>/<subtopic>
+        if (parts.length < 3) return;
+        if (parts[0] !== "home") return;
+
+        const deviceID = parts[1];
+        if (!deviceID) return;
+
+        const subtopic = parts.slice(2).join("/"); // status / sensors / log
+
+        if (!devices[deviceID]) {
+          createDeviceCard(deviceID);
+        }
+
+        if (subtopic === "status") {
+          updateStatus(deviceID, payload);
+        } else if (subtopic === "sensors") {
+          try {
+            const data = JSON.parse(payload);
+            updateSensor(deviceID, data);
+          } catch (e) {
+            console.error("Eroare parsare sensors:", e);
+          }
+        } else if (subtopic === "log") {
+          updateLog(deviceID, payload);
+        }
+      };
+
+      function connectMQTT() {
+        client.connect({
+          useSSL: true,
+          userName: mqttUser,
+          password: mqttPass,
+          onSuccess: () => {
+            console.log("✔ Conectat la broker MQTT");
+            client.subscribe("home/+/status");
+            client.subscribe("home/+/sensors");
+            client.subscribe("home/+/log");
+          },
+          onFailure: err => console.error("❌ Eroare conectare MQTT", err)
+        });
+      }
+
+      function createDeviceCard(id) {
+        const el = document.createElement("div");
+        el.className = "device-card";
+        el.id = `dev-${id}`;
+        el.innerHTML = `
+          <div class="device-header">
+            <span class="device-id">${id}</span>
+            <span class="status-dot offline" id="status-${id}"></span>
+          </div>
+          <div class="device-body">
+            <div id="data-${id}">...</div>
+            <div id="log-${id}" style="font-size:0.75rem;color:var(--muted);margin-top:4px;">&nbsp;</div>
+            <div class="controls">
+              <button onclick="sendCmd('${id}', 'ping')">Ping</button>
+              <button onclick="sendCmd('${id}', 'reboot')">Reboot</button>
+              <button onclick="sendCmd('${id}', 'reset')">Reset</button>
+            </div>
+          </div>
+        `;
+        deviceList.appendChild(el);
+        devices[id] = true;
+      }
+
+      function updateStatus(id, payload) {
+        const dot = document.getElementById(`status-${id}`);
+        if (!dot) return;
+        dot.className = "status-dot " + (payload === "offline" ? "offline" : "online");
+      }
+
+      function updateSensor(id, data) {
+        const el = document.getElementById(`data-${id}`);
+        if (!el) return;
+        el.innerHTML = `Temp: ${data.temp}°C<br>Umiditate: ${data.hum}%`;
+      }
+
+      function updateLog(id, msg) {
+        const el = document.getElementById(`log-${id}`);
+        if (el) {
+          el.textContent = msg;
+        }
+        appendGlobalLog(`[${id}] ${msg}`);
+      }
+
+      // facem sendCmd global (pentru butoanele din HTML)
+      window.sendCmd = function(id, cmd) {
+        const topic = `home/${id}/cmd/${cmd}`;
+        const msg = new Paho.Message("");
+        msg.destinationName = topic;
+        client.send(msg);
+        console.log("Trimis comanda", cmd, "către", topic);
+      };
+
+      connectMQTT();
     });
-  }
+  </script>
 
-  function createDeviceCard(id) {
-    const el = document.createElement("div");
-    el.className = "device-card";
-    el.id = `dev-${id}`;
-    el.innerHTML = `
-      <div class="device-header">
-        <span class="device-id">${id}</span>
-        <span class="status-dot offline" id="status-${id}"></span>
-      </div>
-      <div class="device-body">
-        <div id="data-${id}">...</div>
-        <div id="log-${id}" style="font-size:0.75rem;color:var(--muted);margin-top:4px;">&nbsp;</div>
-        <div class="controls">
-          <button onclick="sendCmd('${id}', 'ping')">Ping</button>
-          <button onclick="sendCmd('${id}', 'reboot')">Reboot</button>
-          <button onclick="sendCmd('${id}', 'reset')">Reset</button>
-        </div>
-      </div>
-    `;
-    deviceList.appendChild(el);
-    devices[id] = true;
-  }
-  function updateLog(id, msg) {
-    const el = document.getElementById(`log-${id}`);
-    if (el) {
-      el.textContent = msg;
-    }
-    appendGlobalLog(`[${id}] ${msg}`);
-  }
-  function updateStatus(id, payload) {
-    const dot = document.getElementById(`status-${id}`);
-    if (!dot) return;
-    dot.className = "status-dot " + (payload === "offline" ? "offline" : "online");
-  }
-
-  function updateSensor(id, data) {
-    const el = document.getElementById(`data-${id}`);
-    if (!el) return;
-    el.innerHTML = `Temp: ${data.temp}°C<br>Umiditate: ${data.hum}%`;
-  }
-  window.sendCmd = function(id, cmd) {
-    const topic = `home/${id}/cmd/${cmd}`;
-    const msg = new Paho.Message("");   // ← AICI e schimbarea importantă
-    msg.destinationName = topic;
-    client.send(msg);
-    console.log("Trimis comanda", cmd, "către", topic);
-  }
-  connectMQTT();
-});
-</script>
 </body>
 </html>
