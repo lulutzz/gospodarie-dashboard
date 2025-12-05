@@ -399,7 +399,7 @@
       <!-- CAMARA -->
       <div class="card">
           <div class="card-header">
-              <div class="card-title">Cămară EC62609C8900</div>
+              <div class="card-title">Cămară (EC62609C8900)</div>
               <span class="tag tag-room">Camara · fields 2–3</span>
           </div>
 
@@ -544,7 +544,13 @@
             statusEl.className = "status err";
         }
     }
-
+    // Mapare ID ESP32 -> nume prietenos
+    const DEVICE_LABELS = {
+      "EC62609C8900": "Cămară",
+      "7821849F8900": "Bucătărie",
+      "XXXXXXXXXXXX": "Baie"   // înlocuiești cu ID-ul real când îl ai
+    };
+    
     /* ====================== MQTT DASHBOARD ====================== */
 
     window.addEventListener("load", function () {
@@ -619,12 +625,17 @@
       }
 
       function createDeviceCard(id) {
+        const label = DEVICE_LABELS[id] || ("ESP32 " + id); // nume frumos
+
         const el = document.createElement("div");
         el.className = "device-card";
         el.id = `dev-${id}`;
         el.innerHTML = `
           <div class="device-header">
-            <span class="device-id">${id}</span>
+            <div>
+              <div class="device-id">${label}</div>
+              <div style="font-size:0.7rem;color:var(--muted);">${id}</div>
+            </div>
             <span class="status-dot offline" id="status-${id}"></span>
           </div>
           <div class="device-body">
@@ -640,6 +651,7 @@
         deviceList.appendChild(el);
         devices[id] = true;
       }
+
 
       function updateStatus(id, payload) {
         const dot = document.getElementById(`status-${id}`);
