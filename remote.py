@@ -27,7 +27,6 @@ from machine import Pin, deepsleep, WDT
 # ============================================================
 # 1. CONFIG – valori statice
 # ============================================================
-sensor = dht.DHT11(Pin(4))
 SENSOR_PWR_PIN = 23   # pin care alimentează DHT11
 SENSOR_DATA_PIN = 4   # pin de date
 
