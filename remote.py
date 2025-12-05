@@ -344,16 +344,7 @@ while True:
     wdt.feed()
     connect_wifi()
     cfg = fetch_config()
-
-    # Citire senzor
-    try:
-        t, h = read_dht()
-        print("Citire:", t, h)
-    except:
-        print("Eroare senzor")
-        t = None
-        h = None
-
+    t, h = read_dht()
     # Trimite date
     # Trimite date
     if t is not None and h is not None:
