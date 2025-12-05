@@ -27,6 +27,12 @@ from machine import Pin, deepsleep, WDT
 # ============================================================
 # 1. CONFIG – valori statice
 # ============================================================
+sensor = dht.DHT11(Pin(4))
+SENSOR_PWR_PIN = 23   # pin care alimentează DHT11
+SENSOR_DATA_PIN = 4   # pin de date
+
+pwr_pin = Pin(SENSOR_PWR_PIN, Pin.OUT, value=0)  # pornim cu senzorul OPRIT
+data_pin = Pin(SENSOR_DATA_PIN, Pin.IN)          # inițial intrare
 
 WIFI_SSID = "DIGI-Y4bX"
 WIFI_PASS = "Burlusi166?"
@@ -303,11 +309,36 @@ def send_telegram(msg):
         print("Eroare TG:", e)
 
 
+def read_dht():
+    # 1. Pornește alimentarea senzorului
+    pwr_pin.value(1)
+    time.sleep(2)  # DHT11 are nevoie de ~1–2s să se stabilizeze
+
+    # 2. Citește senzorul
+    sensor = dht.DHT11(Pin(SENSOR_DATA_PIN))
+    try:
+        sensor.measure()
+        t = sensor.temperature()
+        h = sensor.humidity()
+        print("Citire:", t, h)
+    except Exception as e:
+        print("Eroare senzor:", e)
+        t = None
+        h = None
+
+    # 3. Oprește alimentarea senzorului
+    pwr_pin.value(0)
+    # IMPORTANT: pune DATA în high-Z ca să nu “alimentezi” senzorul prin linia de date
+    Pin(SENSOR_DATA_PIN, Pin.IN)
+
+    return t, h
+
+
+
 # ============================================================
 # 9. Program principal
 # ============================================================
 
-sensor = dht.DHT11(Pin(4))
 
 while True:
 
@@ -317,9 +348,7 @@ while True:
 
     # Citire senzor
     try:
-        sensor.measure()
-        t = sensor.temperature()
-        h = sensor.humidity()
+        t, h = read_dht()
         print("Citire:", t, h)
     except:
         print("Eroare senzor")
