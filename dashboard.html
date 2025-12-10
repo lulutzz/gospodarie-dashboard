@@ -1,13 +1,17 @@
-<!DOCTYPE html>
+<!DOCTYPE html> 
 <html lang="ro">
 <head>
   <meta charset="UTF-8">
   <title>Gospodărie – Dashboard & Config</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <!-- Paho MQTT – NU MODIFICĂM -->
+  <!-- Paho MQTT -->
   <!--<script src="https://unpkg.com/paho-mqtt/mqttws31.min.js"></script>-->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/paho-mqtt.min.js"></script>
+
+  <!-- Chart.js + datalabels pentru grafice -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
 
   <style>
     :root {
@@ -20,6 +24,7 @@
       --success: #22c55e;
       --text: #e5e7eb;
       --muted: #9ca3af;
+      --border: rgba(148,163,184,0.3);
     }
 
     * { box-sizing: border-box; }
@@ -63,7 +68,7 @@
       align-items: baseline;
       justify-content: space-between;
       gap: 8px;
-      margin-bottom: 12px;
+      margin-bottom: 8px;
     }
 
     .main-header h1 {
@@ -92,6 +97,39 @@
 
     .badge-mqtt { border-color: rgba(56,189,248,0.7); color: var(--accent); }
     .badge-ts   { border-color: rgba(34,197,94,0.7);  color: var(--accent2); }
+
+    /* TAB-URI */
+
+    .tabs {
+      margin-top: 6px;
+      margin-bottom: 10px;
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .tab-btn {
+      border-radius: 999px;
+      border: 1px solid rgba(148,163,184,0.35);
+      background: rgba(15,23,42,0.9);
+      color: var(--muted);
+      padding: 6px 12px;
+      font-size: 0.8rem;
+      cursor: pointer;
+    }
+
+    .tab-btn.active {
+      background: linear-gradient(135deg, #0ea5e9, #22c55e);
+      color: #0b1120;
+      border-color: transparent;
+      font-weight: 600;
+    }
+
+    .tab-btn:hover {
+      filter: brightness(1.05);
+    }
+
+    .hidden { display: none; }
 
     /* CARD DISPOZITIV (sidebar) */
 
@@ -167,7 +205,7 @@
       padding: 2px 0;
     }
 
-    /* GRID + CARDURI CONFIG (din control.html) */
+    /* GRID + CARDURI CONFIG */
 
     .section-title {
       margin-top: 18px;
@@ -322,6 +360,107 @@
         color: var(--accent);
         text-decoration: none;
     }
+
+    /* --- STILURI PENTRU GRAFICE --- */
+
+    .chart-wrapper {
+      position: relative;
+      height: 320px;
+      max-height: 320px;
+      overflow: hidden;
+      z-index: 1;
+    }
+
+    @media (max-width: 600px) {
+      .chart-wrapper {
+        height: 260px;
+        max-height: 260px;
+      }
+    }
+
+    .filter-bar {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 10px;
+      font-size: 0.85rem;
+    }
+
+    .filter-bar label {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--muted);
+    }
+
+    .filter-bar input[type="date"] {
+      background: rgba(15,23,42,0.95);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 4px 8px;
+      font-size: 0.8rem;
+      outline: none;
+    }
+
+    .filter-bar input[type="date"]:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px rgba(56,189,248,0.4);
+    }
+
+    .filter-bar button {
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      padding: 5px 10px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      background: rgba(15,23,42,0.95);
+      color: var(--text);
+    }
+
+    .filter-bar button.primary {
+      background: linear-gradient(135deg, #0ea5e9, #22c55e);
+      border: none;
+      color: #0b1120;
+      font-weight: 600;
+    }
+
+    .filter-bar button:hover {
+      filter: brightness(1.05);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    th, td {
+      border-bottom: 1px solid rgba(148,163,184,0.25);
+      padding: 4px 6px;
+      text-align: center;
+    }
+
+    th {
+      color: var(--muted);
+      font-weight: 500;
+    }
+
+    tr:nth-child(even) td {
+      background: rgba(15,23,42,0.6);
+    }
+
+    .no-data {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
   </style>
 </head>
 <body>
@@ -332,177 +471,261 @@
     <div id="deviceList"></div>
   </div>
 
-  <!-- MAIN: MQTT + LOG + CONFIG ThingSpeak -->
+  <!-- MAIN: MQTT + LOG + CONFIG + GRAFICE -->
   <div class="main">
 
     <div class="main-header">
       <div>
         <h1>Panou Gospodărie</h1>
-        <div class="subtitle">Status live & comenzi prin MQTT · Config prin ThingSpeak</div>
+        <div class="subtitle">Status live & comenzi prin MQTT · Config & grafice ThingSpeak</div>
       </div>
       <div class="badge-row">
         <span class="badge badge-mqtt">MQTT – HiveMQ Cloud</span>
-        <span class="badge badge-ts">CONFIG – ThingSpeak (canal 1622205)</span>
+        <span class="badge badge-ts">ThingSpeak – CONFIG & DATA</span>
       </div>
     </div>
 
-    <!-- LOG GLOBAL MQTT -->
-    <div id="globalLog" class="log-panel">
-      <div style="opacity:0.6;font-size:0.85rem;">
-        Aici vor apărea ultimele mesaje de la dispozitive (log, erori senzori, ping etc.).
+    <!-- TAB-URI -->
+    <div class="tabs">
+      <button class="tab-btn active" data-view="control">Control & Config</button>
+      <button class="tab-btn" data-view="charts">Grafice temperatură</button>
+    </div>
+
+    <!-- ============ VIEW CONTROL (LOG + CONFIG) ============ -->
+    <div id="view-control">
+      <!-- LOG GLOBAL MQTT -->
+      <div id="globalLog" class="log-panel">
+        <div style="opacity:0.6;font-size:0.85rem;">
+          Aici vor apărea ultimele mesaje de la dispozitive (log, erori senzori, ping etc.).
+        </div>
       </div>
-    </div>
 
-    <!-- SECȚIUNE CONFIG THINGSPEAK -->
-    <div class="section-title">Configurare senzori</div>
-    <div class="section-subtitle">
-      Panoul de mai jos trimite comenzi către ThingSpeak (CONFIG – Gospodărie, ID: 1622205), iar ESP32 citește aceste valori la următorul ciclu.
-    </div>
+      <!-- SECȚIUNE CONFIG THINGSPEAK -->
+      <div class="section-title">Configurare senzori</div>
+      <div class="section-subtitle">
+        Panoul de mai jos trimite comenzi către ThingSpeak (CONFIG – Gospodărie, ID: 1622205), iar ESP32 citește aceste valori la următorul ciclu.
+      </div>
 
-    <div class="grid grid-2">
+      <div class="grid grid-2">
 
-      <!-- GLOBAL -->
+        <!-- GLOBAL -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">Setări globale</div>
+                <span class="tag tag-global">Global</span>
+            </div>
+
+            <div class="row">
+                <div class="field">
+                    <label for="sleep_minutes">Sleep (minute) – field1</label>
+                    <input id="sleep_minutes" type="number" min="1" max="180" placeholder="ex: 30">
+                </div>
+                <div class="field">
+                    <label for="debug">DEBUGGING – field8</label>
+                    <select id="debug">
+                        <option value="">(nu modific)</option>
+                        <option value="1">1 – DEBUG ON (fără sleep)</option>
+                        <option value="0">0 – PROD (cu sleep)</option>
+                    </select>
+                </div>
+            </div>
+
+            <button class="btn-primary" onclick="
+                const sleepVal = document.getElementById('sleep_minutes').value;
+                const debugVal = document.getElementById('debug').value;
+                const fields = {};
+                if (sleepVal !== '') fields['field1'] = Number(sleepVal);
+                if (debugVal !== '') fields['field8'] = Number(debugVal);
+                sendConfig(fields, 'status-global');
+            ">
+                💾 Salvează globale
+            </button>
+            <div id="status-global" class="status"></div>
+        </div>
+
+        <!-- CAMARA -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">Cămară (EC62609C8900)</div>
+                <span class="tag tag-room">Camara · fields 2–3</span>
+            </div>
+
+            <div class="row">
+                <div class="field">
+                    <label for="camara_temp">Prag temperatură (°C) – field2</label>
+                    <input id="camara_temp" type="number" step="0.1" placeholder="ex: 25">
+                </div>
+                <div class="field">
+                    <label for="camara_hum">Prag umiditate (%) – field3</label>
+                    <input id="camara_hum" type="number" step="1" placeholder="ex: 60">
+                </div>
+            </div>
+
+            <button class="btn-primary" onclick="
+                const t = document.getElementById('camara_temp').value;
+                const h = document.getElementById('camara_hum').value;
+                const fields = {};
+                if (t !== '') fields['field2'] = Number(t);
+                if (h !== '') fields['field3'] = Number(h);
+                sendConfig(fields, 'status-camara');
+            ">
+                💾 Salvează Cămară
+            </button>
+            <div id="status-camara" class="status"></div>
+        </div>
+
+      </div>
+
+      <div class="grid grid-2" style="margin-top:10px;">
+
+        <!-- BAIE -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">Baie</div>
+                <span class="tag tag-room">Baie · fields 4–5</span>
+            </div>
+
+            <div class="row">
+                <div class="field">
+                    <label for="baie_temp">Prag temperatură (°C) – field4</label>
+                    <input id="baie_temp" type="number" step="0.1" placeholder="ex: 28">
+                </div>
+                <div class="field">
+                    <label for="baie_hum">Prag umiditate (%) – field5</label>
+                    <input id="baie_hum" type="number" step="1" placeholder="ex: 75">
+                </div>
+            </div>
+
+            <button class="btn-primary" onclick="
+                const t = document.getElementById('baie_temp').value;
+                const h = document.getElementById('baie_hum').value;
+                const fields = {};
+                if (t !== '') fields['field4'] = Number(t);
+                if (h !== '') fields['field5'] = Number(h);
+                sendConfig(fields, 'status-baie');
+            ">
+                💾 Salvează Baie
+            </button>
+            <div id="status-baie" class="status"></div>
+        </div>
+
+        <!-- BUCATARIE -->
+        <div class="card">
+            <div class="card-header">
+                <div class="card-title">Bucătărie (7821849F8900)</div>
+                <span class="tag tag-room">Bucătărie · fields 6–7</span>
+            </div>
+
+            <div class="row">
+                <div class="field">
+                    <label for="buc_temp">Prag temperatură (°C) – field6</label>
+                    <input id="buc_temp" type="number" step="0.1" placeholder="ex: 27">
+                </div>
+                <div class="field">
+                    <label for="buc_hum">Prag umiditate (%) – field7</label>
+                    <input id="buc_hum" type="number" step="1" placeholder="ex: 70">
+                </div>
+            </div>
+
+            <button class="btn-primary" onclick="
+                const t = document.getElementById('buc_temp').value;
+                const h = document.getElementById('buc_hum').value;
+                const fields = {};
+                if (t !== '') fields['field6'] = Number(t);
+                if (h !== '') fields['field7'] = Number(h);
+                sendConfig(fields, 'status-buc');
+            ">
+                💾 Salvează Bucătărie
+            </button>
+            <div id="status-buc" class="status"></div>
+        </div>
+
+      </div>
+
+      <div class="footer">
+          Panoul trimite direct comenzi către ThingSpeak prin API-ul <code>update</code>.<br>
+          După salvare, valorile apar în canalul <strong>CONFIG – Gospodărie (1622205)</strong>, iar ESP32 le va citi la următorul ciclu.
+      </div>
+    </div> <!-- end #view-control -->
+
+    <!-- ============ VIEW CHARTS (GRAFICE) ============ -->
+    <div id="view-charts" class="hidden">
       <div class="card">
-          <div class="card-header">
-              <div class="card-title">Setări globale</div>
-              <span class="tag tag-global">Global</span>
+        <div class="card-header">
+          <div>
+            <div class="card-title">Evoluție temperatură</div>
+            <div style="font-size:0.8rem;color:var(--muted);">
+              Roșu = Cămară (field1) · Albastru = Bucătărie (field5) · canal DATA 1613849
+            </div>
           </div>
+          <span class="tag">Grafice interactive</span>
+        </div>
 
-          <div class="row">
-              <div class="field">
-                  <label for="sleep_minutes">Sleep (minute) – field1</label>
-                  <input id="sleep_minutes" type="number" min="1" max="180" placeholder="ex: 30">
-              </div>
-              <div class="field">
-                  <label for="debug">DEBUGGING – field8</label>
-                  <select id="debug">
-                      <option value="">(nu modific)</option>
-                      <option value="1">1 – DEBUG ON (fără sleep)</option>
-                      <option value="0">0 – PROD (cu sleep)</option>
-                  </select>
-              </div>
-          </div>
+        <!-- FILTRE DATA -->
+        <div class="filter-bar">
+          <label>
+            De la:
+            <input type="date" id="dateFrom">
+          </label>
+          <label>
+            Până la:
+            <input type="date" id="dateTo">
+          </label>
 
-          <button class="btn-primary" onclick="
-              const sleepVal = document.getElementById('sleep_minutes').value;
-              const debugVal = document.getElementById('debug').value;
-              const fields = {};
-              if (sleepVal !== '') fields['field1'] = Number(sleepVal);
-              if (debugVal !== '') fields['field8'] = Number(debugVal);
-              sendConfig(fields, 'status-global');
-          ">
-              💾 Salvează globale
-          </button>
-          <div id="status-global" class="status"></div>
+          <button id="btnToday">Astăzi</button>
+          <button id="btnLast24">Ultimele 24h</button>
+          <button id="btnApply" class="primary">Aplică filtrul</button>
+        </div>
+
+        <!-- GRAFIC -->
+        <div class="chart-wrapper">
+          <canvas id="tempChart"></canvas>
+        </div>
+
+        <div id="chartMessage" class="no-data"></div>
       </div>
 
-      <!-- CAMARA -->
       <div class="card">
-          <div class="card-header">
-              <div class="card-title">Cămară (EC62609C8900)</div>
-              <span class="tag tag-room">Camara · fields 2–3</span>
+        <div class="card-header">
+          <div class="card-title">Statistici – ultimele 7 zile</div>
+          <span class="tag">Min / Max pe zi · Cămară & Bucătărie</span>
+        </div>
+
+        <div class="grid grid-2">
+          <div>
+            <h3 style="margin:0 0 4px;font-size:0.85rem;">Cămară (field1)</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Min (°C)</th>
+                  <th>Max (°C)</th>
+                </tr>
+              </thead>
+              <tbody id="tblCamara"></tbody>
+            </table>
           </div>
 
-          <div class="row">
-              <div class="field">
-                  <label for="camara_temp">Prag temperatură (°C) – field2</label>
-                  <input id="camara_temp" type="number" step="0.1" placeholder="ex: 25">
-              </div>
-              <div class="field">
-                  <label for="camara_hum">Prag umiditate (%) – field3</label>
-                  <input id="camara_hum" type="number" step="1" placeholder="ex: 60">
-              </div>
+          <div>
+            <h3 style="margin:0 0 4px;font-size:0.85rem;">Bucătărie (field5)</h3>
+            <table>
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Min (°C)</th>
+                  <th>Max (°C)</th>
+                </tr>
+              </thead>
+              <tbody id="tblBucatarie"></tbody>
+            </table>
           </div>
-
-          <button class="btn-primary" onclick="
-              const t = document.getElementById('camara_temp').value;
-              const h = document.getElementById('camara_hum').value;
-              const fields = {};
-              if (t !== '') fields['field2'] = Number(t);
-              if (h !== '') fields['field3'] = Number(h);
-              sendConfig(fields, 'status-camara');
-          ">
-              💾 Salvează Cămară
-          </button>
-          <div id="status-camara" class="status"></div>
+        </div>
       </div>
-
-    </div>
-
-    <div class="grid grid-2" style="margin-top:10px;">
-
-      <!-- BAIE -->
-      <div class="card">
-          <div class="card-header">
-              <div class="card-title">Baie</div>
-              <span class="tag tag-room">Baie · fields 4–5</span>
-          </div>
-
-          <div class="row">
-              <div class="field">
-                  <label for="baie_temp">Prag temperatură (°C) – field4</label>
-                  <input id="baie_temp" type="number" step="0.1" placeholder="ex: 28">
-              </div>
-              <div class="field">
-                  <label for="baie_hum">Prag umiditate (%) – field5</label>
-                  <input id="baie_hum" type="number" step="1" placeholder="ex: 75">
-              </div>
-          </div>
-
-          <button class="btn-primary" onclick="
-              const t = document.getElementById('baie_temp').value;
-              const h = document.getElementById('baie_hum').value;
-              const fields = {};
-              if (t !== '') fields['field4'] = Number(t);
-              if (h !== '') fields['field5'] = Number(h);
-              sendConfig(fields, 'status-baie');
-          ">
-              💾 Salvează Baie
-          </button>
-          <div id="status-baie" class="status"></div>
-      </div>
-
-      <!-- BUCATARIE -->
-      <div class="card">
-          <div class="card-header">
-              <div class="card-title">Bucătărie (7821849F8900)</div>
-              <span class="tag tag-room">Bucătărie · fields 6–7</span>
-          </div>
-
-          <div class="row">
-              <div class="field">
-                  <label for="buc_temp">Prag temperatură (°C) – field6</label>
-                  <input id="buc_temp" type="number" step="0.1" placeholder="ex: 27">
-              </div>
-              <div class="field">
-                  <label for="buc_hum">Prag umiditate (%) – field7</label>
-                  <input id="buc_hum" type="number" step="1" placeholder="ex: 70">
-              </div>
-          </div>
-
-          <button class="btn-primary" onclick="
-              const t = document.getElementById('buc_temp').value;
-              const h = document.getElementById('buc_hum').value;
-              const fields = {};
-              if (t !== '') fields['field6'] = Number(t);
-              if (h !== '') fields['field7'] = Number(h);
-              sendConfig(fields, 'status-buc');
-          ">
-              💾 Salvează Bucătărie
-          </button>
-          <div id="status-buc" class="status"></div>
-      </div>
-
-    </div>
-
-    <div class="footer">
-        Panoul trimite direct comenzi către ThingSpeak prin API-ul <code>update</code>.<br>
-        După salvare, valorile apar în canalul <strong>CONFIG – Gospodărie (1622205)</strong>, iar ESP32 le va citi la următorul ciclu.
-    </div>
+    </div> <!-- end #view-charts -->
 
   </div> <!-- end .main -->
 
-  <!-- SCRIPT COMUN: ThingSpeak + MQTT -->
+  <!-- SCRIPT COMUN: ThingSpeak + MQTT + GRAFICE -->
   <script>
     /* ====================== THINGSPEAK CONFIG ====================== */
 
@@ -544,18 +767,299 @@
             statusEl.className = "status err";
         }
     }
+
     // Mapare ID ESP32 -> nume prietenos
     const DEVICE_LABELS = {
       "EC62609C8900": "Cămară",
       "7821849F8900": "Bucătărie",
       "XXXXXXXXXXXX": "Baie"   // înlocuiești cu ID-ul real când îl ai
     };
-    
+
+    /* ====================== GRAFICE (ThingSpeak DATA) ====================== */
+
+    const CHANNEL_ID = 1613849;     // DATA – Gospodărie
+    const RESULTS    = 800;
+    const URL_DATA   = `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?results=${RESULTS}`;
+
+    let allPoints = [];
+    let tempChart = null;
+
+    Chart.register(ChartDataLabels);
+
+    function sameDay(d1, d2) {
+      return d1.getFullYear() === d2.getFullYear() &&
+             d1.getMonth()    === d2.getMonth() &&
+             d1.getDate()     === d2.getDate();
+    }
+
+    function toDateString(d) {
+      return d.toISOString().slice(0, 10);
+    }
+
+    function renderChart(points) {
+      const msgEl = document.getElementById('chartMessage');
+      if (!msgEl) return; // dacă suntem într-o versiune fără charts
+
+      if (!points.length) {
+        if (tempChart) {
+          tempChart.destroy();
+          tempChart = null;
+        }
+        msgEl.textContent = "Nu există date pentru intervalul selectat.";
+        return;
+      } else {
+        msgEl.textContent = "";
+      }
+
+      const labels = points.map(p =>
+        p.time.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })
+      );
+      const camData = points.map(p => p.cam);
+      const bucData = points.map(p => p.buc);
+
+      const canvas = document.getElementById('tempChart');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      if (tempChart) tempChart.destroy();
+
+      tempChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [
+            {
+              label: 'Cămară',
+              data: camData,
+              borderColor: 'rgba(239,68,68,0.9)',
+              backgroundColor: 'rgba(239,68,68,0.25)',
+              tension: 0.25,
+              spanGaps: true,
+              pointRadius: 2
+            },
+            {
+              label: 'Bucătărie',
+              data: bucData,
+              borderColor: 'rgba(56,189,248,0.9)',
+              backgroundColor: 'rgba(56,189,248,0.25)',
+              tension: 0.25,
+              spanGaps: true,
+              pointRadius: 2
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: {
+            mode: 'nearest',
+            intersect: false
+          },
+          plugins: {
+            legend: {
+              labels: { color: '#e5e7eb', font: { size: 11 } }
+            },
+            tooltip: {
+              callbacks: {
+                label: ctx => {
+                  const v = ctx.parsed.y;
+                  if (v == null) return '';
+                  return `${ctx.dataset.label}: ${v.toFixed(1)} °C`;
+                }
+              }
+            },
+            datalabels: {
+              color: '#e5e7eb',
+              align: 'top',
+              anchor: 'end',
+              clamp: true,
+              display: ctx => ctx.dataIndex % 6 === 0,
+              formatter: v => (v == null ? '' : v.toFixed(1)),
+              font: { size: 9 }
+            }
+          },
+          scales: {
+            x: {
+              ticks: {
+                color: '#9ca3af',
+                maxRotation: 0,
+                autoSkip: true,
+                maxTicksLimit: 10
+              },
+              grid: { color: 'rgba(75,85,99,0.3)' }
+            },
+            y: {
+              ticks: {
+                color: '#9ca3af',
+                callback: v => v + '°C'
+              },
+              grid: { color: 'rgba(75,85,99,0.3)' }
+            }
+          }
+        }
+      });
+    }
+
+    function computeLast7DaysStats() {
+      const tblCam = document.getElementById('tblCamara');
+      const tblBuc = document.getElementById('tblBucatarie');
+      if (!tblCam || !tblBuc) return;
+
+      tblCam.innerHTML = '';
+      tblBuc.innerHTML = '';
+
+      if (!allPoints.length) return;
+
+      const dayMap = new Map();
+
+      allPoints.forEach(p => {
+        const key = toDateString(p.time);
+        if (!dayMap.has(key)) {
+          dayMap.set(key, { cam: [], buc: [] });
+        }
+        if (p.cam != null) dayMap.get(key).cam.push(p.cam);
+        if (p.buc != null) dayMap.get(key).buc.push(p.buc);
+      });
+
+      const days = Array.from(dayMap.keys()).sort();
+      const last7 = days.slice(-7);
+
+      last7.forEach(d => {
+        const entry = dayMap.get(d);
+
+        // Cămară
+        if (entry.cam.length) {
+          const minC = Math.min.apply(null, entry.cam);
+          const maxC = Math.max.apply(null, entry.cam);
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td>${d}</td>
+            <td>${minC.toFixed(1)}</td>
+            <td>${maxC.toFixed(1)}</td>
+          `;
+          tblCam.appendChild(tr);
+        } else {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${d}</td><td>-</td><td>-</td>`;
+          tblCam.appendChild(tr);
+        }
+
+        // Bucătărie
+        if (entry.buc.length) {
+          const minB = Math.min.apply(null, entry.buc);
+          const maxB = Math.max.apply(null, entry.buc);
+          const tr2 = document.createElement('tr');
+          tr2.innerHTML = `
+            <td>${d}</td>
+            <td>${minB.toFixed(1)}</td>
+            <td>${maxB.toFixed(1)}</td>
+          `;
+          tblBuc.appendChild(tr2);
+        } else {
+          const tr2 = document.createElement('tr');
+          tr2.innerHTML = `<td>${d}</td><td>-</td><td>-</td>`;
+          tblBuc.appendChild(tr2);
+        }
+      });
+    }
+
+    function applyTodayFilter() {
+      if (!allPoints.length) return;
+      const today = new Date();
+      const todayPoints = allPoints.filter(p => sameDay(p.time, today));
+      if (!todayPoints.length) {
+        const fallback = allPoints.slice(-100);
+        renderChart(fallback);
+        const msgEl = document.getElementById('chartMessage');
+        if (msgEl)
+          msgEl.textContent = "Nu există date pentru astăzi – se afișează ultimele valori disponibile.";
+      } else {
+        renderChart(todayPoints);
+      }
+
+      const isoToday = toDateString(today);
+      const df = document.getElementById('dateFrom');
+      const dt = document.getElementById('dateTo');
+      if (df) df.value = isoToday;
+      if (dt) dt.value = isoToday;
+    }
+
+    function applyLast24hFilter() {
+      if (!allPoints.length) return;
+      const now = new Date();
+      const limit = now.getTime() - 24 * 60 * 60 * 1000;
+      const filtered = allPoints.filter(p => p.time.getTime() >= limit);
+      renderChart(filtered);
+    }
+
+    function applyCustomRange() {
+      if (!allPoints.length) return;
+
+      const df = document.getElementById('dateFrom');
+      const dt = document.getElementById('dateTo');
+      if (!df || !dt) return;
+
+      const fromVal = df.value;
+      const toVal   = dt.value;
+
+      if (!fromVal && !toVal) {
+        applyTodayFilter();
+        return;
+      }
+
+      let fromTime = null;
+      let toTime   = null;
+
+      if (fromVal) fromTime = new Date(fromVal + 'T00:00:00');
+      if (toVal)   toTime   = new Date(toVal   + 'T23:59:59');
+
+      const filtered = allPoints.filter(p => {
+        if (fromTime && p.time < fromTime) return false;
+        if (toTime   && p.time > toTime)   return false;
+        return true;
+      });
+
+      renderChart(filtered);
+    }
+
+    async function initCharts() {
+      // dacă nu există secțiunea de grafice (alt build), nu facem nimic
+      if (!document.getElementById('tempChart')) return;
+
+      try {
+        const resp = await fetch(URL_DATA);
+        const js   = await resp.json();
+        const feeds = js.feeds || [];
+
+        allPoints = feeds.map(f => {
+          const t = new Date(f.created_at);
+          const cam = f.field1 != null ? parseFloat(f.field1) : null; // Camara
+          const buc = f.field5 != null ? parseFloat(f.field5) : null; // Bucatarie
+          return { time: t, cam, buc };
+        });
+
+        applyTodayFilter();
+        computeLast7DaysStats();
+
+        const btnToday  = document.getElementById('btnToday');
+        const btn24     = document.getElementById('btnLast24');
+        const btnApply  = document.getElementById('btnApply');
+
+        if (btnToday) btnToday.addEventListener('click', applyTodayFilter);
+        if (btn24)    btn24.addEventListener('click', applyLast24hFilter);
+        if (btnApply) btnApply.addEventListener('click', applyCustomRange);
+
+      } catch (err) {
+        console.error("Eroare la citirea ThingSpeak (DATA):", err);
+        const msgEl = document.getElementById('chartMessage');
+        if (msgEl) msgEl.textContent = "Eroare la citirea datelor din ThingSpeak.";
+      }
+    }
+
     /* ====================== MQTT DASHBOARD ====================== */
 
     window.addEventListener("load", function () {
       const deviceList = document.getElementById('deviceList');
-      const devices = {}; // ID → state
+      const devices = {};
       const globalLog = document.getElementById('globalLog');
 
       function appendGlobalLog(text) {
@@ -563,13 +1067,13 @@
         const line = document.createElement('div');
         const now  = new Date().toLocaleTimeString();
         line.textContent = `${now} · ${text}`;
-        globalLog.prepend(line);   // ultimele mesaje sus
+        globalLog.prepend(line);
       }
 
-      // CONFIG MQTT – NEATINS
+      // CONFIG MQTT
       const host = "c72cc38c1f184d0199cc4daa938bac6f.s1.eu.hivemq.cloud";
-      const port = 8884;              // WebSocket TLS
-      const path = "/mqtt";           // default HiveMQ WS path
+      const port = 8884;
+      const path = "/mqtt";
       const mqttUser = "burlusi";
       const mqttPass = "Burlusi166?";
       const clientId = "webclient_" + Math.random().toString(16).substr(2, 8);
@@ -582,14 +1086,13 @@
         const payload = msg.payloadString;
         const parts   = topic.split("/");
 
-        // așteptăm home/<ID>/<subtopic>
         if (parts.length < 3) return;
         if (parts[0] !== "home") return;
 
         const deviceID = parts[1];
         if (!deviceID) return;
 
-        const subtopic = parts.slice(2).join("/"); // status / sensors / log
+        const subtopic = parts.slice(2).join("/");
 
         if (!devices[deviceID]) {
           createDeviceCard(deviceID);
@@ -625,7 +1128,7 @@
       }
 
       function createDeviceCard(id) {
-        const label = DEVICE_LABELS[id] || ("ESP32 " + id); // nume frumos
+        const label = DEVICE_LABELS[id] || ("ESP32 " + id);
 
         const el = document.createElement("div");
         el.className = "device-card";
@@ -652,7 +1155,6 @@
         devices[id] = true;
       }
 
-
       function updateStatus(id, payload) {
         const dot = document.getElementById(`status-${id}`);
         if (!dot) return;
@@ -673,7 +1175,6 @@
         appendGlobalLog(`[${id}] ${msg}`);
       }
 
-      // facem sendCmd global (pentru butoanele din HTML)
       window.sendCmd = function(id, cmd) {
         const topic = `home/${id}/cmd/${cmd}`;
         const msg = new Paho.Message("");
@@ -682,7 +1183,30 @@
         console.log("Trimis comanda", cmd, "către", topic);
       };
 
+      // TAB-URI: schimbă între Control & Grafice
+      const tabButtons = document.querySelectorAll('.tab-btn');
+      const viewControl = document.getElementById('view-control');
+      const viewCharts  = document.getElementById('view-charts');
+
+      tabButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+          tabButtons.forEach(b => b.classList.remove('active'));
+          btn.addEventListener;
+          btn.classList.add('active');
+
+          const view = btn.dataset.view;
+          if (view === 'control') {
+            viewControl.classList.remove('hidden');
+            viewCharts.classList.add('hidden');
+          } else {
+            viewCharts.classList.remove('hidden');
+            viewControl.classList.add('hidden');
+          }
+        });
+      });
+
       connectMQTT();
+      initCharts();  // pornește logica de grafice / ThingSpeak DATA
     });
   </script>
 
