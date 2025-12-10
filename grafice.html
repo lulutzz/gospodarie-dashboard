@@ -2,10 +2,10 @@
 <html lang="ro">
 <head>
   <meta charset="UTF-8">
-  <title>Gospodărie – Grafice Temperaturi</title>
+  <title>Gospodărie – Grafice temperatură2</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
 
-  <!-- Chart.js + plugin pentru etichete pe puncte -->
+  <!-- Chart.js + datalabels -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
 
@@ -14,7 +14,8 @@
       --bg: #0f172a;
       --card-bg: #111827;
       --accent: #38bdf8;
-      --accent2: #f97316;
+      --accent2: #22c55e;
+      --danger: #ef4444;
       --text: #e5e7eb;
       --muted: #9ca3af;
       --border: rgba(148,163,184,0.3);
@@ -24,393 +25,555 @@
 
     body {
       margin: 0;
-      padding: 0;
+      padding: 16px;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       background: radial-gradient(circle at top, #1f2937 0, #020617 55%, #000 100%);
       color: var(--text);
-      min-height: 100vh;
+    }
+
+    h1 {
+      margin: 0 0 4px;
+      font-size: 1.5rem;
+      text-align: center;
+    }
+
+    .subtitle {
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 14px;
     }
 
     .container {
       max-width: 1100px;
       margin: 0 auto;
-      padding: 16px;
     }
 
-    header {
-      margin-bottom: 16px;
+    .card {
+      background: linear-gradient(135deg, rgba(15,23,42,0.95), rgba(15,23,42,0.85));
+      border-radius: 14px;
+      padding: 14px 16px;
+      box-shadow: 0 18px 40px rgba(0,0,0,0.5);
+      border: 1px solid var(--border);
+      margin-bottom: 18px;
+      position: relative;
+      overflow: hidden;
     }
 
-    header h1 {
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(circle at top left, rgba(56,189,248,0.12), transparent 55%);
+      opacity: 0.7;
+      pointer-events: none;
+    }
+
+    .card-header {
+      position: relative;
+      z-index: 1;
+      margin-bottom: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: baseline;
+    }
+
+    .card-header h2 {
       margin: 0;
-      font-size: 1.6rem;
+      font-size: 1.15rem;
     }
 
-    header .subtitle {
-      font-size: 0.85rem;
+    .tag {
+      font-size: 0.75rem;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(148,163,184,0.5);
       color: var(--muted);
     }
 
-    .chart-card {
-      background: var(--card-bg);
-      border-radius: 14px;
-      border: 1px solid var(--border);
-      padding: 14px;
-      box-shadow: 0 18px 40px rgba(0,0,0,0.5);
-      margin-bottom: 14px;
-    }
-    .chart-wrapper {
-      position: relative;
-      height: 320px;      /* înălțime fixă pentru grafic */
-      max-height: 320px;
-      overflow: hidden;   /* nu lăsăm să iasă în afară */
+    .tag-info {
+      border-color: rgba(56,189,248,0.8);
+      color: var(--accent);
     }
 
-    /* opțional, micșorăm un pic canvasul pe mobile */
+    .chart-wrapper {
+      position: relative;
+      height: 320px;
+      max-height: 320px;
+      overflow: hidden;
+      z-index: 1;
+    }
+
     @media (max-width: 600px) {
       .chart-wrapper {
         height: 260px;
         max-height: 260px;
       }
     }
-    
-    .chart-card h2 {
-      margin: 0 0 8px;
-      font-size: 1.05rem;
+
+    .filter-bar {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 10px;
+      font-size: 0.85rem;
     }
 
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 10px;
-      margin-bottom: 14px;
-    }
-
-    .stat-card {
-      background: #020617;
-      border-radius: 12px;
-      border: 1px solid var(--border);
-      padding: 10px 12px;
-      font-size: 0.9rem;
-    }
-
-    .stat-title {
-      font-size: 0.8rem;
+    .filter-bar label {
+      display: flex;
+      align-items: center;
+      gap: 4px;
       color: var(--muted);
-      margin-bottom: 2px;
     }
 
-    .stat-value {
-      font-size: 1rem;
+    .filter-bar input[type="date"] {
+      background: rgba(15,23,42,0.95);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      padding: 4px 8px;
+      font-size: 0.8rem;
+      outline: none;
+    }
+
+    .filter-bar input[type="date"]:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px rgba(56,189,248,0.4);
+    }
+
+    .filter-bar button {
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      padding: 5px 10px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      background: rgba(15,23,42,0.95);
+      color: var(--text);
+    }
+
+    .filter-bar button.primary {
+      background: linear-gradient(135deg, #0ea5e9, #22c55e);
+      border: none;
+      color: #0b1120;
       font-weight: 600;
     }
 
-    .stat-sub {
-      font-size: 0.8rem;
-      color: var(--muted);
+    .filter-bar button:hover {
+      filter: brightness(1.05);
+    }
+
+    .grid-2 {
+      display: grid;
+      gap: 16px;
+    }
+
+    @media (min-width: 768px) {
+      .grid-2 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
     }
 
     table {
       width: 100%;
       border-collapse: collapse;
-      font-size: 0.85rem;
+      font-size: 0.8rem;
+      position: relative;
+      z-index: 1;
     }
 
     th, td {
-      border: 1px solid var(--border);
+      border-bottom: 1px solid rgba(148,163,184,0.25);
       padding: 4px 6px;
       text-align: center;
     }
 
     th {
-      background: #020617;
       color: var(--muted);
+      font-weight: 500;
     }
 
-    .footer {
-      margin-top: 14px;
-      font-size: 0.75rem;
-      color: var(--muted);
-      text-align: center;
+    tr:nth-child(even) td {
+      background: rgba(15,23,42,0.6);
     }
 
-    .tag {
-      font-size: 0.75rem;
+    .no-data {
+      font-size: 0.85rem;
       color: var(--muted);
+      margin-top: 6px;
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <header>
-      <h1>Grafice temperatură – Camară & Bucătărie</h1>
-      <div class="subtitle">
-        Date din ThingSpeak · canal <strong>DATA – Gospodărie (1613849)</strong> ·
-        field1 = Cămară, field5 = Bucătărie
+    <h1>Temperaturi – Gospodărie</h1>
+    <div class="subtitle">
+      Grafic interactiv pentru Cămară (field1) și Bucătărie (field5) – canal DATA 1613849 (ThingSpeak).
+    </div>
+
+    <!-- CARD GRAFIC + FILTRE -->
+    <div class="card">
+      <div class="card-header">
+        <h2>Evoluție temperatură</h2>
+        <span class="tag tag-info">Roșu = Cămară · Albastru = Bucătărie</span>
       </div>
-    </header>
 
-    <!-- CARD GRAFIC -->
-    <div class="chart-card">
-      <h2>Evoluție temperatură (ultimele valori disponibile)</h2>
-      <div class="tag">Linie roșie = Cămară · linie albastră = Bucătărie</div>
+      <!-- FILTRE DATA -->
+      <div class="filter-bar">
+        <label>
+          De la:
+          <input type="date" id="dateFrom">
+        </label>
+        <label>
+          Până la:
+          <input type="date" id="dateTo">
+        </label>
 
+        <button id="btnToday">Astăzi</button>
+        <button id="btnLast24">Ultimele 24h</button>
+        <button id="btnApply" class="primary">Aplică filtrul</button>
+      </div>
+
+      <!-- GRAFIC -->
       <div class="chart-wrapper">
         <canvas id="tempChart"></canvas>
       </div>
+
+      <div id="chartMessage" class="no-data"></div>
     </div>
 
+    <!-- CARD STATISTICI ULTIMELE 7 ZILE -->
+    <div class="card">
+      <div class="card-header">
+        <h2>Statistici – ultimele 7 zile</h2>
+        <span class="tag">Min / Max pe zi · Cămară & Bucătărie</span>
+      </div>
 
-    <!-- CARDURI STATISTICI 24H -->
-    <div class="stats-grid" id="stats24h">
-      <!-- se umple din JavaScript -->
-    </div>
+      <div class="grid-2">
+        <div>
+          <h3 style="margin:0 0 4px;font-size:0.85rem;">Cămară (field1)</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Min (°C)</th>
+                <th>Max (°C)</th>
+              </tr>
+            </thead>
+            <tbody id="tblCamara"></tbody>
+          </table>
+        </div>
 
-    <!-- TABEL 7 ZILE -->
-    <div class="chart-card">
-      <h2>Min / Max pe zi – ultimele 7 zile</h2>
-      <table id="table7d">
-        <thead>
-          <tr>
-            <th>Zi</th>
-            <th>Camara · Min (°C)</th>
-            <th>Camara · Max (°C)</th>
-            <th>Bucătărie · Min (°C)</th>
-            <th>Bucătărie · Max (°C)</th>
-          </tr>
-        </thead>
-        <tbody>
-          <!-- se umple din JavaScript -->
-        </tbody>
-      </table>
-    </div>
-
-    <div class="footer">
-      Grafice generate local cu Chart.js, folosind datele din ThingSpeak.  
-      Poți actualiza pagina pentru a vedea cele mai noi măsurători.
+        <div>
+          <h3 style="margin:0 0 4px;font-size:0.85rem;">Bucătărie (field5)</h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Min (°C)</th>
+                <th>Max (°C)</th>
+              </tr>
+            </thead>
+            <tbody id="tblBucatarie"></tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </div>
 
-  <script>
-    // ======== CONFIG THINGSPEAK ========
-    const CHANNEL_ID = 1613849;      // DATA – Gospodărie
-    const RESULTS    = 1000;         // câte înregistrări să cerem
-    const TS_URL = `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?results=${RESULTS}`;
+<script>
+  // ===================== CONFIG =====================
+  const CHANNEL_ID = 1613849;     // DATA – Gospodărie
+  const RESULTS    = 800;         // câte puncte luăm maxim
+  const URL = `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?results=${RESULTS}`;
 
-    // ======== UTILS ========
-    function formatLabelDate(d) {
-      // ex: "08-12 14:30"
-      return d.toLocaleString('ro-RO', {
-        day: '2-digit',
-        month: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    }
+  let allPoints = [];   // toate citirile
+  let tempChart = null; // instanța Chart.js
 
-    function safeMin(arr) {
-      return arr.length ? Math.min.apply(null, arr) : null;
-    }
-    function safeMax(arr) {
-      return arr.length ? Math.max.apply(null, arr) : null;
-    }
+  Chart.register(ChartDataLabels);
 
-    // ======== LOAD DATA ========
-    async function loadData() {
-      try {
-        const resp = await fetch(TS_URL);
-        const json = await resp.json();
-        const feeds = json.feeds || [];
+  // ===================== HELPERI =====================
 
-        if (!feeds.length) {
-          alert("Nu există date în canalul DATA – Gospodărie.");
-          return;
-        }
+  function sameDay(d1, d2) {
+    return d1.getFullYear() === d2.getFullYear() &&
+           d1.getMonth()    === d2.getMonth() &&
+           d1.getDate()     === d2.getDate();
+  }
 
-        const all = [];
-        for (const f of feeds) {
-          const t = new Date(f.created_at);
-          const cam = parseFloat(f.field1);  // Camara Temp
-          const buc = parseFloat(f.field5);  // Bucatarie Temp
+  function toDateString(d) {
+    // format YYYY-MM-DD
+    return d.toISOString().slice(0, 10);
+  }
 
-          all.push({
-            time: t,
-            camTemp: isNaN(cam) ? null : cam,
-            bucTemp: isNaN(buc) ? null : buc
-          });
-        }
+  function renderChart(points) {
+    const msgEl = document.getElementById('chartMessage');
 
-        buildChart(all);
-        buildStats(all);
-        build7dTable(all);
-
-      } catch (e) {
-        console.error(e);
-        alert("Eroare la citirea datelor din ThingSpeak.");
+    if (!points.length) {
+      if (tempChart) {
+        tempChart.destroy();
+        tempChart = null;
       }
+      msgEl.textContent = "Nu există date pentru intervalul selectat.";
+      return;
+    } else {
+      msgEl.textContent = "";
     }
 
-    // ======== CHART ========
-    function buildChart(data) {
-      const labels = data.map(r => formatLabelDate(r.time));
-      const camVals = data.map(r => r.camTemp);
-      const bucVals = data.map(r => r.bucTemp);
+    const labels = points.map(p =>
+      p.time.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })
+    );
+    const camData = points.map(p => p.cam);
+    const bucData = points.map(p => p.buc);
 
-      const ctx = document.getElementById('tempChart').getContext('2d');
+    const ctx = document.getElementById('tempChart').getContext('2d');
+    if (tempChart) tempChart.destroy();
 
-      new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels: labels,
-          datasets: [
-            {
-              label: 'Camara',
-              data: camVals,
-              borderColor: '#dc2626',   // roșu
-              backgroundColor: 'rgba(220,38,38,0.2)',
-              spanGaps: true,
-              tension: 0.25,
-              pointRadius: 2,
-              pointHoverRadius: 4
-            },
-            {
-              label: 'Bucătărie',
-              data: bucVals,
-              borderColor: '#38bdf8',   // albastru
-              backgroundColor: 'rgba(56,189,248,0.2)',
-              spanGaps: true,
-              tension: 0.25,
-              pointRadius: 2,
-              pointHoverRadius: 4
-            }
-          ]
+    tempChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [
+          {
+            label: 'Cămară',
+            data: camData,
+            borderColor: 'rgba(239,68,68,0.9)',
+            backgroundColor: 'rgba(239,68,68,0.25)',
+            tension: 0.25,
+            spanGaps: true,
+            pointRadius: 2
+          },
+          {
+            label: 'Bucătărie',
+            data: bucData,
+            borderColor: 'rgba(56,189,248,0.9)',
+            backgroundColor: 'rgba(56,189,248,0.25)',
+            tension: 0.25,
+            spanGaps: true,
+            pointRadius: 2
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: {
+          mode: 'nearest',
+          intersect: false
         },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: {
-              labels: { color: '#e5e7eb' }
-            },
-            tooltip: {
-              callbacks: {
-                label: (ctx) => {
-                  const v = ctx.parsed.y;
-                  if (v == null) return ' n/a';
-                  return ' ' + ctx.dataset.label + ': ' + v.toFixed(1) + ' °C';
-                }
+        plugins: {
+          legend: {
+            labels: { color: '#e5e7eb', font: { size: 11 } }
+          },
+          tooltip: {
+            callbacks: {
+              label: ctx => {
+                const v = ctx.parsed.y;
+                if (v == null) return '';
+                return `${ctx.dataset.label}: ${v.toFixed(1)} °C`;
               }
-            },
-            datalabels: {
-              align: 'top',
-              anchor: 'end',
-              color: '#9ca3af',
-              formatter: (value) => {
-                if (value == null || isNaN(value)) return '';
-                return value.toFixed(1);
-              },
-              font: { size: 8 }
             }
           },
-          scales: {
-            x: {
-              ticks: { color: '#9ca3af', maxRotation: 60, minRotation: 30 }
-            },
-            y: {
-              ticks: { color: '#9ca3af' },
-              title: {
-                display: true,
-                text: 'Temperatură (°C)',
-                color: '#9ca3af'
-              }
-            }
+          datalabels: {
+            color: '#e5e7eb',
+            align: 'top',
+            anchor: 'end',
+            clamp: true,
+            display: ctx => ctx.dataIndex % 6 === 0, // etichetă la fiecare ~6 puncte
+            formatter: v => (v == null ? '' : v.toFixed(1)),
+            font: { size: 9 }
           }
         },
-        plugins: [ChartDataLabels]
-      });
-    }
-
-    // ======== STATS 24H ========
-    function buildStats(data) {
-      const now = Date.now();
-      const limit = now - 24 * 60 * 60 * 1000;
-      const last24 = data.filter(r => r.time.getTime() >= limit);
-
-      const camVals = last24.filter(r => r.camTemp != null).map(r => r.camTemp);
-      const bucVals = last24.filter(r => r.bucTemp != null).map(r => r.bucTemp);
-
-      const statsDiv = document.getElementById('stats24h');
-      statsDiv.innerHTML = '';  // clear
-
-      function card(title, minV, maxV) {
-        const div = document.createElement('div');
-        div.className = 'stat-card';
-        div.innerHTML = `
-          <div class="stat-title">${title}</div>
-          <div class="stat-value">
-            Min: ${minV == null ? '-' : minV.toFixed(1)} °C<br>
-            Max: ${maxV == null ? '-' : maxV.toFixed(1)} °C
-          </div>
-          <div class="stat-sub">Ultimele 24 ore</div>
-        `;
-        statsDiv.appendChild(div);
-      }
-
-      card('Cămară', safeMin(camVals), safeMax(camVals));
-      card('Bucătărie', safeMin(bucVals), safeMax(bucVals));
-    }
-
-    // ======== TABEL 7 ZILE ========
-    function build7dTable(data) {
-      const now = Date.now();
-      const limit = now - 7 * 24 * 60 * 60 * 1000;
-      const last7 = data.filter(r => r.time.getTime() >= limit);
-
-      const byDay = {};  // key: YYYY-MM-DD
-
-      for (const r of last7) {
-        const d = r.time;
-        const key = d.getFullYear() + '-' +
-                    String(d.getMonth()+1).padStart(2,'0') + '-' +
-                    String(d.getDate()).padStart(2,'0');
-
-        if (!byDay[key]) {
-          byDay[key] = { cam: [], buc: [] };
+        scales: {
+          x: {
+            ticks: {
+              color: '#9ca3af',
+              maxRotation: 0,
+              autoSkip: true,
+              maxTicksLimit: 10
+            },
+            grid: { color: 'rgba(75,85,99,0.3)' }
+          },
+          y: {
+            ticks: {
+              color: '#9ca3af',
+              callback: v => v + '°C'
+            },
+            grid: { color: 'rgba(75,85,99,0.3)' }
+          }
         }
-        if (r.camTemp != null) byDay[key].cam.push(r.camTemp);
-        if (r.bucTemp != null) byDay[key].buc.push(r.bucTemp);
       }
+    });
+  }
 
-      const tbody = document.querySelector('#table7d tbody');
-      tbody.innerHTML = '';
+  function computeLast7DaysStats() {
+    const tblCam = document.getElementById('tblCamara');
+    const tblBuc = document.getElementById('tblBucatarie');
+    tblCam.innerHTML = '';
+    tblBuc.innerHTML = '';
 
-      const days = Object.keys(byDay).sort();  // crescător
+    if (!allPoints.length) return;
 
-      if (!days.length) {
-        const tr = document.createElement('tr');
-        tr.innerHTML = `<td colspan="5">Nu există date în ultimele 7 zile.</td>`;
-        tbody.appendChild(tr);
-        return;
+    // grupăm datele pe zi: YYYY-MM-DD
+    const dayMap = new Map();
+
+    allPoints.forEach(p => {
+      const key = toDateString(p.time);
+      if (!dayMap.has(key)) {
+        dayMap.set(key, {
+          cam: [],
+          buc: []
+        });
       }
+      if (p.cam != null) dayMap.get(key).cam.push(p.cam);
+      if (p.buc != null) dayMap.get(key).buc.push(p.buc);
+    });
 
-      for (const day of days) {
-        const camArr = byDay[day].cam;
-        const bucArr = byDay[day].buc;
+    // sortăm zilele și luăm ultimele 7
+    const days = Array.from(dayMap.keys()).sort();
+    const last7 = days.slice(-7);
 
+    last7.forEach(d => {
+      const entry = dayMap.get(d);
+
+      // Camara
+      if (entry.cam.length) {
+        const minC = Math.min.apply(null, entry.cam);
+        const maxC = Math.max.apply(null, entry.cam);
         const tr = document.createElement('tr');
         tr.innerHTML = `
-          <td>${day}</td>
-          <td>${camArr.length ? safeMin(camArr).toFixed(1) : '-'}</td>
-          <td>${camArr.length ? safeMax(camArr).toFixed(1) : '-'}</td>
-          <td>${bucArr.length ? safeMin(bucArr).toFixed(1) : '-'}</td>
-          <td>${bucArr.length ? safeMax(bucArr).toFixed(1) : '-'}</td>
+          <td>${d}</td>
+          <td>${minC.toFixed(1)}</td>
+          <td>${maxC.toFixed(1)}</td>
         `;
-        tbody.appendChild(tr);
+        tblCam.appendChild(tr);
+      } else {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${d}</td><td>-</td><td>-</td>`;
+        tblCam.appendChild(tr);
       }
+
+      // Bucatarie
+      if (entry.buc.length) {
+        const minB = Math.min.apply(null, entry.buc);
+        const maxB = Math.max.apply(null, entry.buc);
+        const tr2 = document.createElement('tr');
+        tr2.innerHTML = `
+          <td>${d}</td>
+          <td>${minB.toFixed(1)}</td>
+          <td>${maxB.toFixed(1)}</td>
+        `;
+        tblBuc.appendChild(tr2);
+      } else {
+        const tr2 = document.createElement('tr');
+        tr2.innerHTML = `<td>${d}</td><td>-</td><td>-</td>`;
+        tblBuc.appendChild(tr2);
+      }
+    });
+  }
+
+  // ===================== FILTRE =====================
+
+  function applyTodayFilter() {
+    if (!allPoints.length) return;
+    const today = new Date();
+    const todayPoints = allPoints.filter(p => sameDay(p.time, today));
+    if (!todayPoints.length) {
+      // fallback: ultimele 100 de puncte
+      const fallback = allPoints.slice(-100);
+      renderChart(fallback);
+      document.getElementById('chartMessage').textContent =
+        "Nu există date pentru astăzi – se afișează ultimele valori disponibile.";
+    } else {
+      renderChart(todayPoints);
     }
 
-    // PORNIM
-    loadData();
-  </script>
+    // setăm input-urile de dată pe azi
+    const isoToday = toDateString(today);
+    document.getElementById('dateFrom').value = isoToday;
+    document.getElementById('dateTo').value   = isoToday;
+  }
+
+  function applyLast24hFilter() {
+    if (!allPoints.length) return;
+    const now = new Date();
+    const limit = now.getTime() - 24 * 60 * 60 * 1000;
+
+    const filtered = allPoints.filter(p => p.time.getTime() >= limit);
+    if (!filtered.length) {
+      renderChart([]);
+      return;
+    }
+    renderChart(filtered);
+  }
+
+  function applyCustomRange() {
+    if (!allPoints.length) return;
+
+    const fromVal = document.getElementById('dateFrom').value;
+    const toVal   = document.getElementById('dateTo').value;
+
+    if (!fromVal && !toVal) {
+      applyTodayFilter();
+      return;
+    }
+
+    let fromTime = null;
+    let toTime   = null;
+
+    if (fromVal) fromTime = new Date(fromVal + 'T00:00:00');
+    if (toVal)   toTime   = new Date(toVal   + 'T23:59:59');
+
+    const filtered = allPoints.filter(p => {
+      if (fromTime && p.time < fromTime) return false;
+      if (toTime   && p.time > toTime)   return false;
+      return true;
+    });
+
+    if (!filtered.length) {
+      renderChart([]);
+      return;
+    }
+    renderChart(filtered);
+  }
+
+  // ===================== FETCH + INIT =====================
+
+  async function init() {
+    try {
+      const resp = await fetch(URL);
+      const js   = await resp.json();
+      const feeds = js.feeds || [];
+
+      allPoints = feeds.map(f => {
+        const t = new Date(f.created_at);
+        const cam = f.field1 != null ? parseFloat(f.field1) : null; // Camara
+        const buc = f.field5 != null ? parseFloat(f.field5) : null; // Bucatarie
+        return { time: t, cam, buc };
+      });
+
+      // FILTRU implicit: ASTĂZI (sau fallback ultimele valori)
+      applyTodayFilter();
+
+      // Tabel statistici 7 zile
+      computeLast7DaysStats();
+
+      // Legăm butoanele
+      document.getElementById('btnToday').addEventListener('click', applyTodayFilter);
+      document.getElementById('btnLast24').addEventListener('click', applyLast24hFilter);
+      document.getElementById('btnApply').addEventListener('click', applyCustomRange);
+
+    } catch (err) {
+      console.error("Eroare la citirea ThingSpeak:", err);
+      document.getElementById('chartMessage').textContent =
+        "Eroare la citirea datelor din ThingSpeak.";
+    }
+  }
+
+  init();
+</script>
 </body>
 </html>
