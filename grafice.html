@@ -59,7 +59,21 @@
       box-shadow: 0 18px 40px rgba(0,0,0,0.5);
       margin-bottom: 14px;
     }
+    .chart-wrapper {
+      position: relative;
+      height: 320px;      /* înălțime fixă pentru grafic */
+      max-height: 320px;
+      overflow: hidden;   /* nu lăsăm să iasă în afară */
+    }
 
+    /* opțional, micșorăm un pic canvasul pe mobile */
+    @media (max-width: 600px) {
+      .chart-wrapper {
+        height: 260px;
+        max-height: 260px;
+      }
+    }
+    
     .chart-card h2 {
       margin: 0 0 8px;
       font-size: 1.05rem;
@@ -140,8 +154,12 @@
     <div class="chart-card">
       <h2>Evoluție temperatură (ultimele valori disponibile)</h2>
       <div class="tag">Linie roșie = Cămară · linie albastră = Bucătărie</div>
-      <canvas id="tempChart" height="120"></canvas>
+
+      <div class="chart-wrapper">
+        <canvas id="tempChart"></canvas>
+      </div>
     </div>
+
 
     <!-- CARDURI STATISTICI 24H -->
     <div class="stats-grid" id="stats24h">
