@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8">
+  <title>Gospodărie – Grafice Temperaturi</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Chart.js + plugin pentru etichete pe puncte -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #111827;
+      --accent: #38bdf8;
+      --accent2: #f97316;
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --border: rgba(148,163,184,0.3);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top, #1f2937 0, #020617 55%, #000 100%);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 16px;
+    }
+
+    header {
+      margin-bottom: 16px;
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 1.6rem;
+    }
+
+    header .subtitle {
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+
+    .chart-card {
+      background: var(--card-bg);
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      padding: 14px;
+      box-shadow: 0 18px 40px rgba(0,0,0,0.5);
+      margin-bottom: 14px;
+    }
+
+    .chart-card h2 {
+      margin: 0 0 8px;
+      font-size: 1.05rem;
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .stat-card {
+      background: #020617;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      padding: 10px 12px;
+      font-size: 0.9rem;
+    }
+
+    .stat-title {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-bottom: 2px;
+    }
+
+    .stat-value {
+      font-size: 1rem;
+      font-weight: 600;
+    }
+
+    .stat-sub {
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+
+    th, td {
+      border: 1px solid var(--border);
+      padding: 4px 6px;
+      text-align: center;
+    }
+
+    th {
+      background: #020617;
+      color: var(--muted);
+    }
+
+    .footer {
+      margin-top: 14px;
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-align: center;
+    }
+
+    .tag {
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Grafice temperatură – Camară & Bucătărie</h1>
+      <div class="subtitle">
+        Date din ThingSpeak · canal <strong>DATA – Gospodărie (1613849)</strong> ·
+        field1 = Cămară, field5 = Bucătărie
+      </div>
+    </header>
+
+    <!-- CARD GRAFIC -->
+    <div class="chart-card">
+      <h2>Evoluție temperatură (ultimele valori disponibile)</h2>
+      <div class="tag">Linie roșie = Cămară · linie albastră = Bucătărie</div>
+      <canvas id="tempChart" height="120"></canvas>
+    </div>
+
+    <!-- CARDURI STATISTICI 24H -->
+    <div class="stats-grid" id="stats24h">
+      <!-- se umple din JavaScript -->
+    </div>
+
+    <!-- TABEL 7 ZILE -->
+    <div class="chart-card">
+      <h2>Min / Max pe zi – ultimele 7 zile</h2>
+      <table id="table7d">
+        <thead>
+          <tr>
+            <th>Zi</th>
+            <th>Camara · Min (°C)</th>
+            <th>Camara · Max (°C)</th>
+            <th>Bucătărie · Min (°C)</th>
+            <th>Bucătărie · Max (°C)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- se umple din JavaScript -->
+        </tbody>
+      </table>
+    </div>
+
+    <div class="footer">
+      Grafice generate local cu Chart.js, folosind datele din ThingSpeak.  
+      Poți actualiza pagina pentru a vedea cele mai noi măsurători.
+    </div>
+  </div>
+
+  <script>
+    // ======== CONFIG THINGSPEAK ========
+    const CHANNEL_ID = 1613849;      // DATA – Gospodărie
+    const RESULTS    = 1000;         // câte înregistrări să cerem
+    const TS_URL = `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?results=${RESULTS}`;
+
+    // ======== UTILS ========
+    function formatLabelDate(d) {
+      // ex: "08-12 14:30"
+      return d.toLocaleString('ro-RO', {
+        day: '2-digit',
+        month: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+    }
+
+    function safeMin(arr) {
+      return arr.length ? Math.min.apply(null, arr) : null;
+    }
+    function safeMax(arr) {
+      return arr.length ? Math.max.apply(null, arr) : null;
+    }
+
+    // ======== LOAD DATA ========
+    async function loadData() {
+      try {
+        const resp = await fetch(TS_URL);
+        const json = await resp.json();
+        const feeds = json.feeds || [];
+
+        if (!feeds.length) {
+          alert("Nu există date în canalul DATA – Gospodărie.");
+          return;
+        }
+
+        const all = [];
+        for (const f of feeds) {
+          const t = new Date(f.created_at);
+          const cam = parseFloat(f.field1);  // Camara Temp
+          const buc = parseFloat(f.field5);  // Bucatarie Temp
+
+          all.push({
+            time: t,
+            camTemp: isNaN(cam) ? null : cam,
+            bucTemp: isNaN(buc) ? null : buc
+          });
+        }
+
+        buildChart(all);
+        buildStats(all);
+        build7dTable(all);
+
+      } catch (e) {
+        console.error(e);
+        alert("Eroare la citirea datelor din ThingSpeak.");
+      }
+    }
+
+    // ======== CHART ========
+    function buildChart(data) {
+      const labels = data.map(r => formatLabelDate(r.time));
+      const camVals = data.map(r => r.camTemp);
+      const bucVals = data.map(r => r.bucTemp);
+
+      const ctx = document.getElementById('tempChart').getContext('2d');
+
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [
+            {
+              label: 'Camara',
+              data: camVals,
+              borderColor: '#dc2626',   // roșu
+              backgroundColor: 'rgba(220,38,38,0.2)',
+              spanGaps: true,
+              tension: 0.25,
+              pointRadius: 2,
+              pointHoverRadius: 4
+            },
+            {
+              label: 'Bucătărie',
+              data: bucVals,
+              borderColor: '#38bdf8',   // albastru
+              backgroundColor: 'rgba(56,189,248,0.2)',
+              spanGaps: true,
+              tension: 0.25,
+              pointRadius: 2,
+              pointHoverRadius: 4
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              labels: { color: '#e5e7eb' }
+            },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => {
+                  const v = ctx.parsed.y;
+                  if (v == null) return ' n/a';
+                  return ' ' + ctx.dataset.label + ': ' + v.toFixed(1) + ' °C';
+                }
+              }
+            },
+            datalabels: {
+              align: 'top',
+              anchor: 'end',
+              color: '#9ca3af',
+              formatter: (value) => {
+                if (value == null || isNaN(value)) return '';
+                return value.toFixed(1);
+              },
+              font: { size: 8 }
+            }
+          },
+          scales: {
+            x: {
+              ticks: { color: '#9ca3af', maxRotation: 60, minRotation: 30 }
+            },
+            y: {
+              ticks: { color: '#9ca3af' },
+              title: {
+                display: true,
+                text: 'Temperatură (°C)',
+                color: '#9ca3af'
+              }
+            }
+          }
+        },
+        plugins: [ChartDataLabels]
+      });
+    }
+
+    // ======== STATS 24H ========
+    function buildStats(data) {
+      const now = Date.now();
+      const limit = now - 24 * 60 * 60 * 1000;
+      const last24 = data.filter(r => r.time.getTime() >= limit);
+
+      const camVals = last24.filter(r => r.camTemp != null).map(r => r.camTemp);
+      const bucVals = last24.filter(r => r.bucTemp != null).map(r => r.bucTemp);
+
+      const statsDiv = document.getElementById('stats24h');
+      statsDiv.innerHTML = '';  // clear
+
+      function card(title, minV, maxV) {
+        const div = document.createElement('div');
+        div.className = 'stat-card';
+        div.innerHTML = `
+          <div class="stat-title">${title}</div>
+          <div class="stat-value">
+            Min: ${minV == null ? '-' : minV.toFixed(1)} °C<br>
+            Max: ${maxV == null ? '-' : maxV.toFixed(1)} °C
+          </div>
+          <div class="stat-sub">Ultimele 24 ore</div>
+        `;
+        statsDiv.appendChild(div);
+      }
+
+      card('Cămară', safeMin(camVals), safeMax(camVals));
+      card('Bucătărie', safeMin(bucVals), safeMax(bucVals));
+    }
+
+    // ======== TABEL 7 ZILE ========
+    function build7dTable(data) {
+      const now = Date.now();
+      const limit = now - 7 * 24 * 60 * 60 * 1000;
+      const last7 = data.filter(r => r.time.getTime() >= limit);
+
+      const byDay = {};  // key: YYYY-MM-DD
+
+      for (const r of last7) {
+        const d = r.time;
+        const key = d.getFullYear() + '-' +
+                    String(d.getMonth()+1).padStart(2,'0') + '-' +
+                    String(d.getDate()).padStart(2,'0');
+
+        if (!byDay[key]) {
+          byDay[key] = { cam: [], buc: [] };
+        }
+        if (r.camTemp != null) byDay[key].cam.push(r.camTemp);
+        if (r.bucTemp != null) byDay[key].buc.push(r.bucTemp);
+      }
+
+      const tbody = document.querySelector('#table7d tbody');
+      tbody.innerHTML = '';
+
+      const days = Object.keys(byDay).sort();  // crescător
+
+      if (!days.length) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td colspan="5">Nu există date în ultimele 7 zile.</td>`;
+        tbody.appendChild(tr);
+        return;
+      }
+
+      for (const day of days) {
+        const camArr = byDay[day].cam;
+        const bucArr = byDay[day].buc;
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${day}</td>
+          <td>${camArr.length ? safeMin(camArr).toFixed(1) : '-'}</td>
+          <td>${camArr.length ? safeMax(camArr).toFixed(1) : '-'}</td>
+          <td>${bucArr.length ? safeMin(bucArr).toFixed(1) : '-'}</td>
+          <td>${bucArr.length ? safeMax(bucArr).toFixed(1) : '-'}</td>
+        `;
+        tbody.appendChild(tr);
+      }
+    }
+
+    // PORNIM
+    loadData();
+  </script>
+</body>
+</html>
