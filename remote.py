@@ -326,7 +326,9 @@ def read_dht(samples=5, delay_s=1):
 
     for i in range(samples):
         try:
-            t, h = read_dht()
+            sensor.measure()
+            t = sensor.temperature()
+            h = sensor.humidity()
             print("Citire[{}]: T={} H={}".format(i+1, t, h))
 
             if t is not None and h is not None:
@@ -354,7 +356,6 @@ def read_dht(samples=5, delay_s=1):
     else:
         print("Nicio citire DHT11 validă.")
         return None, None
-
 
 # ============================================================
 # 9. Program principal
