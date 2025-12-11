@@ -308,30 +308,54 @@ def send_telegram(msg):
         print("Eroare TG:", e)
 
 
-def read_dht():
+def read_dht(samples=5, delay_s=1):
+    """
+    Citește DHT11 de mai multe ori și întoarce media.
+    - samples: nr. de citiri (default 5)
+    - delay_s: pauza între citiri (default 1s)
+    """
+
     # 1. Pornește alimentarea senzorului
     pwr_pin.value(1)
     time.sleep(2)  # DHT11 are nevoie de ~1–2s să se stabilizeze
 
-    # 2. Citește senzorul
     sensor = dht.DHT11(Pin(SENSOR_DATA_PIN))
-    try:
-        sensor.measure()
-        t = sensor.temperature()
-        h = sensor.humidity()
-        print("Citire:", t, h)
-    except Exception as e:
-        print("Eroare senzor:", e)
-        t = None
-        h = None
+
+    temps = []
+    hums  = []
+
+    for i in range(samples):
+        try:
+            sensor.measure()
+            t = sensor.temperature()
+            h = sensor.humidity()
+            print("Citire[{}]: T={} H={}".format(i+1, t, h))
+
+            if t is not None and h is not None:
+                temps.append(t)
+                hums.append(h)
+        except Exception as e:
+            print("Eroare senzor (proba {}): {}".format(i+1, e))
+
+        # pauză între citiri (respectăm limita DHT11 ~1s)
+        time.sleep(delay_s)
 
     # 3. Oprește alimentarea senzorului
     pwr_pin.value(0)
     # IMPORTANT: pune DATA în high-Z ca să nu “alimentezi” senzorul prin linia de date
     Pin(SENSOR_DATA_PIN, Pin.IN)
 
-    return t, h
-
+    # 4. Calculăm media, dacă avem măcar o citire validă
+    if temps and hums:
+        # DHT11 are rezoluție de 1°, dar media poate ieși fracționară.
+        # Păstrăm întreg, rotunjit corect.
+        avg_t = int(sum(temps) / len(temps) + 0.5)
+        avg_h = int(sum(hums)  / len(hums)  + 0.5)
+        print("Medie DHT11: T={} H={}".format(avg_t, avg_h))
+        return avg_t, avg_h
+    else:
+        print("Nicio citire DHT11 validă.")
+        return None, None
 
 
 # ============================================================
