@@ -326,9 +326,7 @@ def read_dht(samples=5, delay_s=1):
 
     for i in range(samples):
         try:
-            sensor.measure()
-            t = sensor.temperature()
-            h = sensor.humidity()
+            t, h = read_dht()
             print("Citire[{}]: T={} H={}".format(i+1, t, h))
 
             if t is not None and h is not None:
