@@ -3,6 +3,7 @@ import urequests
 import time
 import dht
 from machine import Pin, deepsleep, WDT
+import ujson
 
 # ============================================================
 #  remote.py v1.2 – Sistem senzori gospodărie
@@ -101,6 +102,110 @@ print("Device:", DEVICE_ID)
 print("Camera:", ROOM)
 print("INFO:", INFO)
 
+# ================= DAILY SUMMARY (Telegram) =====================
+
+SUMMARY_FILE = "daily_summary.json"
+
+daily_state = {
+    "day_index": None,
+    "min_t": None,
+    "max_t": None,
+    "min_h": None,
+    "max_h": None,
+    "alerts": 0,
+}
+
+def load_daily_state():
+    global daily_state
+    try:
+        with open(SUMMARY_FILE, "r") as f:
+            daily_state = ujson.loads(f.read())
+        print("Daily state încărcat:", daily_state)
+    except Exception as e:
+        print("Nu am putut citi daily_state, folosesc valori default:", e)
+        daily_state = {
+            "day_index": None,
+            "min_t": None,
+            "max_t": None,
+            "min_h": None,
+            "max_h": None,
+            "alerts": 0,
+        }
+
+def save_daily_state():
+    try:
+        with open(SUMMARY_FILE, "w") as f:
+            f.write(ujson.dumps(daily_state))
+    except Exception as e:
+        print("Eroare salvare daily_state:", e)
+
+def get_day_index():
+    # număr de zile de la epoch; îl folosim doar pentru comparație (24h)
+    return int(time.time() // 86400)
+
+def send_daily_summary():
+    # folosește Telegram pentru a trimite raportul
+    if daily_state["min_t"] is None:
+        return  # nu avem date
+
+    msg = (
+        "Raport zilnic - {}\n"
+        "Temp min: {} C\nTemp max: {} C\n"
+        "Umiditate min: {} %\nUmiditate max: {} %\n"
+        "Alerte trimise: {}"
+    ).format(
+        ROOM,
+        daily_state["min_t"], daily_state["max_t"],
+        daily_state["min_h"], daily_state["max_h"],
+        daily_state["alerts"],
+    )
+    send_telegram(msg)
+
+def update_daily_stats(t, h, alerts_this_cycle):
+    """
+    Actualizează min/max pe zi + nr. de alerte.
+    Când se schimbă ziua (24h), trimite raport și resetează.
+    """
+    global daily_state
+    day_idx = get_day_index()
+
+    # prima rulare
+    if daily_state["day_index"] is None:
+        daily_state["day_index"] = day_idx
+        daily_state["min_t"] = t
+        daily_state["max_t"] = t
+        daily_state["min_h"] = h
+        daily_state["max_h"] = h
+        daily_state["alerts"] = alerts_this_cycle
+        save_daily_state()
+        return
+
+    # zi nouă -> raport pentru ziua trecută + reset
+    if day_idx != daily_state["day_index"]:
+        send_daily_summary()
+        daily_state["day_index"] = day_idx
+        daily_state["min_t"] = t
+        daily_state["max_t"] = t
+        daily_state["min_h"] = h
+        daily_state["max_h"] = h
+        daily_state["alerts"] = alerts_this_cycle
+        save_daily_state()
+        return
+
+    # aceeași zi → doar actualizăm
+    if t is not None:
+        if daily_state["min_t"] is None or t < daily_state["min_t"]:
+            daily_state["min_t"] = t
+        if daily_state["max_t"] is None or t > daily_state["max_t"]:
+            daily_state["max_t"] = t
+    if h is not None:
+        if daily_state["min_h"] is None or h < daily_state["min_h"]:
+            daily_state["min_h"] = h
+        if daily_state["max_h"] is None or h > daily_state["max_h"]:
+            daily_state["max_h"] = h
+
+    daily_state["alerts"] += alerts_this_cycle
+    save_daily_state()
 
 # ============================================================
 # 3. SAFE MODE – dacă se apasă BOOT
@@ -357,47 +462,57 @@ def read_dht(samples=5, delay_s=1):
         print("Nicio citire DHT11 validă.")
         return None, None
 
+load_daily_state()
+
 # ============================================================
 # 9. Program principal
 # ============================================================
-
-
 while True:
 
     wdt.feed()
     connect_wifi()
     cfg = fetch_config()
     t, h = read_dht()
-    # Trimite date
-    # Trimite date
+
+    alerts_this_cycle = 0   # câte alerte trimitem în ciclul curent
+
     if t is not None and h is not None:
         print("SENZOR:", ROOM, "T=", t, "H=", h)
         ok_ts = send_data(t, h)
         print("TS trimis pentru", ROOM, "ok?", ok_ts)
 
-    # Alerte
-    if t is not None and t >= cfg["alarm_temp"]:
-        send_telegram(
-            "ALERTA TEMPERATURA - {}\nTemperatura: {} C\nPrag: {} C".format(
-                ROOM, t, cfg["alarm_temp"]
+        # Alerte temperatură / umiditate
+        if t >= cfg["alarm_temp"]:
+            send_telegram(
+                "ALERTA TEMPERATURA - {}\nTemperatura: {} C\nPrag: {} C".format(
+                    ROOM, t, cfg["alarm_temp"]
+                )
             )
-        )
+            alerts_this_cycle += 1
 
-    if h is not None and h >= cfg["alarm_hum"]:
-        send_telegram(
-            "ALERTA UMIDITATE - {}\nUmiditate: {} %\nPrag: {} %".format(
-                ROOM, h, cfg["alarm_hum"]
+        if h >= cfg["alarm_hum"]:
+            send_telegram(
+                "ALERTA UMIDITATE - {}\nUmiditate: {} %\nPrag: {} %".format(
+                    ROOM, h, cfg["alarm_hum"]
+                )
             )
-        )
+            alerts_this_cycle += 1
+
+        # actualizăm statisticile zilnice (min/max + nr. alerte)
+        update_daily_stats(t, h, alerts_this_cycle)
+    else:
+        print("Nu am citire DHT validă, sar peste update_daily_stats")
 
     # DEBUGGING → fără deep sleep, doar pauză scurtă
     if cfg["DEBUGGING"] == 1:
         print("DEBUG → reluare 10 sec (soft)")
         for _ in range(30):
             time.sleep(1)
+            wdt.feed()
         continue
 
-    # PRODUCȚIE – folosim din nou deep sleep ca înainte (stabil)
+    # PRODUCȚIE – folosim deep sleep
     minutes = cfg.get("sleep_minutes", 5)
     print("Sleep:", minutes, "minute (deep sleep)")
     deepsleep(int(minutes * 60 * 1000))
+
