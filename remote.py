@@ -198,12 +198,14 @@ def save_daily_state():
         print("Eroare salvare daily_state:", e)
 
 def get_day_index():
-    # număr de zile de la epoch – ne ajunge ca să detectăm schimbarea zilei
+    # număr de zile de la epoch; îl folosim doar pentru comparație (24h)
     return int(time.time() // 86400)
 
 def send_daily_summary():
+    # folosește Telegram pentru a trimite raportul
     if daily_state["min_t"] is None:
-        return
+        return  # nu avem date
+
     msg = (
         "Raport zilnic - {}\n"
         "Temp min: {} C\nTemp max: {} C\n"
@@ -216,17 +218,16 @@ def send_daily_summary():
         daily_state["alerts"],
     )
     send_telegram(msg)
-    mqtt_log("Raport zilnic trimis.")
 
 def update_daily_stats(t, h, alerts_this_cycle):
     """
     Actualizează min/max pe zi + nr. de alerte.
-    Când se schimbă ziua, trimite raport și resetează.
+    Când se schimbă ziua (24h), trimite raport și resetează.
     """
     global daily_state
     day_idx = get_day_index()
 
-    # prima oară: inițializăm
+    # 1) Prima dată – inițializare
     if daily_state["day_index"] is None:
         daily_state["day_index"] = day_idx
         daily_state["min_t"] = t
@@ -237,7 +238,7 @@ def update_daily_stats(t, h, alerts_this_cycle):
         save_daily_state()
         return
 
-    # zi nouă → trimitem raport pentru ziua trecută + reset
+    # 2) Zi nouă -> raport pt ziua anterioară + reset
     if day_idx != daily_state["day_index"]:
         send_daily_summary()
         daily_state["day_index"] = day_idx
@@ -249,7 +250,7 @@ def update_daily_stats(t, h, alerts_this_cycle):
         save_daily_state()
         return
 
-    # aceeași zi → doar actualizăm
+    # 3) Aceeași zi → doar actualizăm
     if t is not None:
         if daily_state["min_t"] is None or t < daily_state["min_t"]:
             daily_state["min_t"] = t
@@ -264,6 +265,7 @@ def update_daily_stats(t, h, alerts_this_cycle):
 
     daily_state["alerts"] += alerts_this_cycle
     save_daily_state()
+
 
 # ============================================================
 # 3. SAFE MODE – dacă se apasă BOOT
