@@ -5,15 +5,28 @@ import dht
 from machine import Pin, deepsleep, WDT
 import ujson
 
-try:
-    import main
-    def log(msg):
-        # tot ce vine din remote apare pe /log
-        main.publish_log("remote: " + msg)
-except:
-    # fallback când rulezi remote.py singur din Thonny
-    def log(msg):
-        print("LOG fallback:", msg)
+import sys
+
+# ================= LOG unificat (console + MQTT) ===================
+
+_mod_main = sys.modules.get("main") or sys.modules.get("__main__")
+
+def log(msg):
+    """
+    Trimite mesajul în consola serială și, dacă există publish_log în main.py,
+    îl trimite și pe MQTT (topic /log).
+    """
+    # mereu în consolă
+    print(msg)
+
+    # dacă main.py e încărcat și are publish_log, îl folosim
+    if _mod_main and hasattr(_mod_main, "publish_log"):
+        try:
+            _mod_main.publish_log(msg)
+        except Exception as e:
+            # dacă pică MQTT, măcar vedem motivul în consolă
+            print("Eroare publish_log:", e)
+
 # ============================================================
 #  remote.py v1.2 – Sistem senzori gospodărie
 #
@@ -106,12 +119,10 @@ DEVICE_ID = get_device_id()
 ROOM = DEVICE_INFO.get(DEVICE_ID, {}).get("name", "UNKNOWN")
 INFO = DEVICE_INFO.get(DEVICE_ID, {})   # <– NOU
 
-print("=== remote.py v1.3 ===")
-print("Device:", DEVICE_ID)
-print("Camera:", ROOM)
-print("INFO:", INFO)
-log("remote.py pornit pentru {} ({})".format(ROOM, DEVICE_ID))
-
+log("=== remote.py v1.3 ===")
+log("Device: {}".format(DEVICE_ID))
+log("Camera: {}".format(ROOM))
+log("INFO: {}".format(INFO))
 
 # ============================================================
 # 3. SAFE MODE – dacă se apasă BOOT
