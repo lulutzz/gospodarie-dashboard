@@ -3,7 +3,14 @@ import urequests
 import time
 import dht
 from machine import Pin, deepsleep, WDT
-
+# ======= Logger comun (către MQTT / consolă) =========
+try:
+    import main           # modulul main există deja, a rulat la boot
+    log = main.publish_log
+except Exception:
+    # fallback: dacă rulăm remote.py singur din Thonny
+    def log(msg):
+        print("LOG:", msg)
 # ============================================================
 #  remote.py v1.2 – Sistem senzori gospodărie
 #
@@ -130,22 +137,18 @@ def connect_wifi():
     wlan.active(True)
 
     if wlan.isconnected():
+        print("WiFi deja conectat:", wlan.ifconfig())
+        log("WiFi deja conectat: {}".format(wlan.ifconfig()[0]))
         return wlan
 
     print("Conectare WiFi...")
+    log("Conectare WiFi...")
+
     wlan.connect(WIFI_SSID, WIFI_PASS)
-
-    timeout = time.time() + 20
-    while not wlan.isconnected():
-        wdt.feed()
-        if time.time() > timeout:
-            print("WiFi FAIL → retry in 60 sec")
-            deepsleep(60000)
-        time.sleep(0.3)
-
+    ...
     print("WiFi OK:", wlan.ifconfig())
+    log("WiFi OK: {}".format(wlan.ifconfig()[0]))
     return wlan
-
 
 # ============================================================
 # 6. Citire CONFIG global
@@ -231,6 +234,7 @@ def send_data(temp, hum):
     ).format(DATA_CHANNEL_API_KEY, f_temp, temp, f_hum, hum)
 
     print("TS[{}]: URL → {}".format(ROOM, base_url))
+    log("Trimit TS: T={} H={} pe {} / {}".format(temp, hum, f_temp, f_hum))
 
     for attempt in range(3):
         now = time.time()
@@ -255,7 +259,9 @@ def send_data(temp, hum):
             print("TS[{}]: DATA (încercarea {}) → {}".format(
                 ROOM, attempt + 1, resp
             ))
-
+            log("TS[{}]: încercarea {} → răspuns {}".format(
+                ROOM, attempt + 1, resp
+            ))          
             if resp != "0":
                 return True
 
@@ -336,6 +342,7 @@ def read_dht(samples=5, delay_s=1):
                 hums.append(h)
         except Exception as e:
             print("Eroare senzor (proba {}): {}".format(i+1, e))
+            log("Eroare senzor DHT11 (proba {}): {}".format(i+1, e))
 
         # pauză între citiri (respectăm limita DHT11 ~1s)
         time.sleep(delay_s)
