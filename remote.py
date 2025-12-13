@@ -169,7 +169,6 @@ def update_daily_stats(t, h, alerts_this_cycle):
     global daily_state
     day_idx = get_day_index()
 
-    # prima rulare
 if daily_state["day_index"] is None:
     daily_state["day_index"] = day_idx
     daily_state["min_t"] = t
