@@ -170,15 +170,17 @@ def update_daily_stats(t, h, alerts_this_cycle):
     day_idx = get_day_index()
 
     # prima rulare
-    if daily_state["day_index"] is None:
-        daily_state["day_index"] = day_idx
-        daily_state["min_t"] = t
-        daily_state["max_t"] = t
-        daily_state["min_h"] = h
-        daily_state["max_h"] = h
-        daily_state["alerts"] = alerts_this_cycle
-        save_daily_state()
-        return
+if daily_state["day_index"] is None:
+    daily_state["day_index"] = day_idx
+    daily_state["min_t"] = t
+    daily_state["max_t"] = t
+    daily_state["min_h"] = h
+    daily_state["max_h"] = h
+    daily_state["alerts"] = alerts_this_cycle
+    save_daily_state()
+    # => trimite și un prim “snapshot” acum
+    send_daily_summary()
+    return
 
     # zi nouă -> raport pentru ziua trecută + reset
     if day_idx != daily_state["day_index"]:
