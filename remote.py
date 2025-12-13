@@ -3,12 +3,19 @@ import urequests
 import time
 import dht
 from machine import Pin, deepsleep, WDT
+import ujson
+
 # ======= Logger comun (către MQTT / consolă) =========
 try:
-    import main           # modulul main există deja, a rulat la boot
-    log = main.publish_log
+    import main  # modulul main.py, expus de sys.modules în main.py
+    def log(msg):
+        try:
+            main.publish_log(msg)
+        except Exception:
+            # dacă MQTT cade, măcar vedem în consolă
+            print("LOG(main err):", msg)
 except Exception:
-    # fallback: dacă rulăm remote.py singur din Thonny
+    # dacă rulezi remote.py singur din Thonny, fără main.py
     def log(msg):
         print("LOG:", msg)
 # ============================================================
@@ -107,6 +114,7 @@ print("=== remote.py v1.3 ===")
 print("Device:", DEVICE_ID)
 print("Camera:", ROOM)
 print("INFO:", INFO)
+log("Pornit remote.py pentru {} ({})".format(ROOM, DEVICE_ID))
 
 
 # ============================================================
