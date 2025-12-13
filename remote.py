@@ -178,8 +178,6 @@ if daily_state["day_index"] is None:
     daily_state["max_h"] = h
     daily_state["alerts"] = alerts_this_cycle
     save_daily_state()
-    # => trimite și un prim “snapshot” acum
-    send_daily_summary()
     return
 
     # zi nouă -> raport pentru ziua trecută + reset
