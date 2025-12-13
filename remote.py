@@ -6,28 +6,9 @@ from machine import Pin, deepsleep, WDT
 import ujson
 
 # ============================================================
-#  remote.py v1.2 – Sistem senzori gospodărie
-#
-#  Funcționalități:
-#   ✔ Autodetectare cameră după Device ID
-#   ✔ Citire CONFIG global (channel 1622205)
-#   ✔ Mapare automată valori pentru Camara / Baie / Bucatarie
-#   ✔ Trimitere date în DATA – Gospodarie (1613849)
-#   ✔ Alerte Telegram (temperatură + umiditate)
-#   ✔ Anti-spam: max 1 alertă / ciclu
-#   ✔ DEBUGGING: fără deep-sleep
-#
-#  Arhitectură ThingSpeak:
-#   CONFIG – Gospodarie     → 1622205
-#   DATA   – Gospodarie     → 1613849 (temp=field1, hum=field2)
-#   LOG    – Alerte         → 1638468 (opțional)
-#
+#  remote.py v1.3 – Sistem senzori gospodărie
 # ============================================================
 
-
-# ============================================================
-# 1. CONFIG – valori statice
-# ============================================================
 SENSOR_PWR_PIN = 23   # pin care alimentează DHT11
 SENSOR_DATA_PIN = 4   # pin de date
 
@@ -37,9 +18,10 @@ data_pin = Pin(SENSOR_DATA_PIN, Pin.IN)          # inițial intrare
 WIFI_SSID = "DIGI-Y4bX"
 WIFI_PASS = "Burlusi166?"
 
-CONFIG_CHANNEL = 1622205         # CONFIG – Gospodarie
+CONFIG_CHANNEL = 1622205               # CONFIG – Gospodarie
 DATA_CHANNEL_API_KEY = "ZPT57WZJNMLGM2X1"   # DATA – Gospodarie
 last_ts_update = 0
+
 TELEGRAM_BOT_TOKEN = "8532839048:AAEznUxSlaUMeNBmxZ0aFT_8vCHnlNqJ4dI"
 TELEGRAM_CHAT_ID   = "1705327493"
 
@@ -81,7 +63,6 @@ DEVICE_INFO = {
     },
 }
 
-
 # ============================================================
 # 2. DETECTAREA CAMEREI DUPĂ DEVICE ID
 # ============================================================
@@ -95,14 +76,16 @@ def get_device_id():
 
 DEVICE_ID = get_device_id()
 ROOM = DEVICE_INFO.get(DEVICE_ID, {}).get("name", "UNKNOWN")
-INFO = DEVICE_INFO.get(DEVICE_ID, {})   # <– NOU
+INFO = DEVICE_INFO.get(DEVICE_ID, {})
 
 print("=== remote.py v1.3 ===")
 print("Device:", DEVICE_ID)
 print("Camera:", ROOM)
 print("INFO:", INFO)
 
-# ================= DAILY SUMMARY (Telegram) =====================
+# ============================================================
+# DAILY SUMMARY (Telegram)
+# ============================================================
 
 SUMMARY_FILE = "daily_summary.json"
 
@@ -169,15 +152,16 @@ def update_daily_stats(t, h, alerts_this_cycle):
     global daily_state
     day_idx = get_day_index()
 
-if daily_state["day_index"] is None:
-    daily_state["day_index"] = day_idx
-    daily_state["min_t"] = t
-    daily_state["max_t"] = t
-    daily_state["min_h"] = h
-    daily_state["max_h"] = h
-    daily_state["alerts"] = alerts_this_cycle
-    save_daily_state()
-    return
+    # prima rulare: inițializăm ziua
+    if daily_state["day_index"] is None:
+        daily_state["day_index"] = day_idx
+        daily_state["min_t"] = t
+        daily_state["max_t"] = t
+        daily_state["min_h"] = h
+        daily_state["max_h"] = h
+        daily_state["alerts"] = alerts_this_cycle
+        save_daily_state()
+        return
 
     # zi nouă -> raport pentru ziua trecută + reset
     if day_idx != daily_state["day_index"]:
@@ -197,6 +181,7 @@ if daily_state["day_index"] is None:
             daily_state["min_t"] = t
         if daily_state["max_t"] is None or t > daily_state["max_t"]:
             daily_state["max_t"] = t
+
     if h is not None:
         if daily_state["min_h"] is None or h < daily_state["min_h"]:
             daily_state["min_h"] = h
@@ -217,13 +202,11 @@ if boot_btn.value() == 0:
     while True:
         time.sleep(1)
 
-
 # ============================================================
 # 4. Watchdog
 # ============================================================
 
 wdt = WDT(timeout=60000)
-
 
 # ============================================================
 # 5. Conectare WiFi
@@ -249,7 +232,6 @@ def connect_wifi():
 
     print("WiFi OK:", wlan.ifconfig())
     return wlan
-
 
 # ============================================================
 # 6. Citire CONFIG global
@@ -411,6 +393,9 @@ def send_telegram(msg):
     except Exception as e:
         print("Eroare TG:", e)
 
+# ============================================================
+# 9. Citire DHT cu medie pe mai multe probe
+# ============================================================
 
 def read_dht(samples=5, delay_s=1):
     """
@@ -461,11 +446,16 @@ def read_dht(samples=5, delay_s=1):
         print("Nicio citire DHT11 validă.")
         return None, None
 
+# ============================================================
+# 10. Pornim – citim daily_state din fișier
+# ============================================================
+
 load_daily_state()
 
 # ============================================================
-# 9. Program principal
+# 11. Program principal
 # ============================================================
+
 while True:
 
     wdt.feed()
@@ -514,4 +504,3 @@ while True:
     minutes = cfg.get("sleep_minutes", 5)
     print("Sleep:", minutes, "minute (deep sleep)")
     deepsleep(int(minutes * 60 * 1000))
-
