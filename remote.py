@@ -385,7 +385,7 @@ def read_dht(samples=5, delay_s=1):
 
 
 while True:
-
+    log("Ciclu nou – citesc DHT & trimit date...")
     wdt.feed()
     connect_wifi()
     cfg = fetch_config()
