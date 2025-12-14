@@ -5,27 +5,18 @@ import dht
 from machine import Pin, deepsleep, WDT
 import ujson
 
-import sys
-
-# ================= LOG unificat (console + MQTT) ===================
-
-_mod_main = sys.modules.get("main") or sys.modules.get("__main__")
+import builtins
 
 def log(msg):
-    """
-    Trimite mesajul în consola serială și, dacă există publish_log în main.py,
-    îl trimite și pe MQTT (topic /log).
-    """
-    # mereu în consolă
+    # mereu vezi în consola serială
     print(msg)
-
-    # dacă main.py e încărcat și are publish_log, îl folosim
-    if _mod_main and hasattr(_mod_main, "publish_log"):
+    # dacă main.py a înregistrat publish_log, trimitem și pe MQTT
+    if hasattr(builtins, "publish_log"):
         try:
-            _mod_main.publish_log(msg)
+            builtins.publish_log(msg)
         except Exception as e:
-            # dacă pică MQTT, măcar vedem motivul în consolă
             print("Eroare publish_log:", e)
+
 
 # ============================================================
 #  remote.py v1.2 – Sistem senzori gospodărie
