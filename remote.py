@@ -5,19 +5,6 @@ import dht
 from machine import Pin, deepsleep, WDT
 import ujson
 
-import builtins
-
-def log(msg):
-    # mereu vezi în consola serială
-    print(msg)
-    # dacă main.py a înregistrat publish_log, trimitem și pe MQTT
-    if hasattr(builtins, "publish_log"):
-        try:
-            builtins.publish_log(msg)
-        except Exception as e:
-            print("Eroare publish_log:", e)
-
-
 # ============================================================
 #  remote.py v1.2 – Sistem senzori gospodărie
 #
@@ -110,10 +97,10 @@ DEVICE_ID = get_device_id()
 ROOM = DEVICE_INFO.get(DEVICE_ID, {}).get("name", "UNKNOWN")
 INFO = DEVICE_INFO.get(DEVICE_ID, {})   # <– NOU
 
-log("=== remote.py v1.3 ===")
-log("Device: {}".format(DEVICE_ID))
-log("Camera: {}".format(ROOM))
-log("INFO: {}".format(INFO))
+publish_log("REMOTE: start")
+publish_log("REMOTE: doing work")
+time.sleep(2)
+publish_log("REMOTE: end")
 
 # ============================================================
 # 3. SAFE MODE – dacă se apasă BOOT
