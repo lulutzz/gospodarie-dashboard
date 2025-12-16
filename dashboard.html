@@ -347,6 +347,22 @@
 
     .status.ok { color: #4ade80; }
     .status.err { color: #f97373; }
+    <!-- SAVE ALL -->
+    <div class="card" style="max-width:980px;margin:14px auto 0;">
+      <div class="card-header">
+        <div class="card-title">Salvare completă</div>
+        <span class="tag tag-global">Global + Camere</span>
+      </div>
+    
+      <button class="btn-primary" onclick="saveAllConfig()">
+        💾 Salvează TOT (ce e completat)
+      </button>
+      <div id="status-all" class="status"></div>
+    
+      <div class="section-subtitle" style="margin:10px 0 0;">
+        Trimite într-o singură cerere doar câmpurile completate (nu suprascrie câmpuri goale).
+      </div>
+    </div>
 
     .footer {
         max-width: 960px;
@@ -766,6 +782,40 @@
             statusEl.textContent = "❌ Eroare: " + err;
             statusEl.className = "status err";
         }
+    }
+    function v(id) {
+      const el = document.getElementById(id);
+      return el ? el.value : "";
+    }
+    
+    function saveAllConfig() {
+      const fields = {};
+    
+      // GLOBAL
+      const sleepVal = v('sleep_minutes');
+      const debugVal = v('debug');
+      if (sleepVal !== '') fields['field1'] = Number(sleepVal);
+      if (debugVal !== '') fields['field8'] = Number(debugVal);
+    
+      // CAMARA
+      const camT = v('camara_temp');
+      const camH = v('camara_hum');
+      if (camT !== '') fields['field2'] = Number(camT);
+      if (camH !== '') fields['field3'] = Number(camH);
+    
+      // BAIE
+      const baiT = v('baie_temp');
+      const baiH = v('baie_hum');
+      if (baiT !== '') fields['field4'] = Number(baiT);
+      if (baiH !== '') fields['field5'] = Number(baiH);
+    
+      // BUCATARIE
+      const bucT = v('buc_temp');
+      const bucH = v('buc_hum');
+      if (bucT !== '') fields['field6'] = Number(bucT);
+      if (bucH !== '') fields['field7'] = Number(bucH);
+    
+      sendConfig(fields, 'status-all');
     }
 
     // Mapare ID ESP32 -> nume prietenos
