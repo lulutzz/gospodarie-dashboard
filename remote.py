@@ -22,7 +22,7 @@ log("logger OK (remote -> dashboard)")
 
 # ============================== CONFIG ==============================
 SENSOR_PWR_PIN  = 23
-SENSOR_DATA_PIN = 4
+SENSOR_DATA_PIN = 22
 
 WIFI_SSID = "DIGI-Y4bX"
 WIFI_PASS = "Burlusi166?"
