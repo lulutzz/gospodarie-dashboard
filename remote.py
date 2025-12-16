@@ -2,7 +2,6 @@
 import time
 import network
 import urequests
-import dht
 import ubinascii
 import machine
 from machine import Pin, WDT, deepsleep
@@ -260,7 +259,6 @@ while True:
             continue
 
         cfg = fetch_config()
-        #t, h = read_dht()
         t, h = mod_dht.read(samples=5, delay_s=1)
 
         if t is None or h is None:
