@@ -1,1264 +1,199 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="ro">
 <head>
-  <meta charset="UTF-8">
-  <title>Gospodărie – Dashboard & Config</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-
-  <!-- Paho MQTT -->
-  <!--<script src="https://unpkg.com/paho-mqtt/mqttws31.min.js"></script>-->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.1.0/paho-mqtt.min.js"></script>
-
-  <!-- Chart.js + datalabels pentru grafice -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gospodărie – Control & Config</title>
 
   <style>
-    :root {
-      --bg: #0f172a;
-      --card-bg: #111827;
-      --accent: #38bdf8;
-      --accent2: #22c55e;
-      --accent3: #f97316;
-      --danger: #ef4444;
-      --success: #22c55e;
-      --text: #e5e7eb;
-      --muted: #9ca3af;
-      --border: rgba(148,163,184,0.3);
+    :root{
+      --bg:#0f172a;        /* slate-900 */
+      --card:#111827;      /* gray-900 */
+      --muted:#94a3b8;     /* slate-400 */
+      --text:#e5e7eb;      /* gray-200 */
+      --accent:#22c55e;    /* green-500 */
+      --accent2:#38bdf8;   /* sky-400 */
+      --warn:#f59e0b;      /* amber-500 */
+      --err:#ef4444;       /* red-500 */
+      --border:#1f2937;    /* gray-800 */
     }
 
-    * { box-sizing: border-box; }
-
-    body {
-      margin: 0;
-      padding: 0;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: radial-gradient(circle at top, #1f2937 0, #020617 55%, #000 100%);
-      color: var(--text);
-      display: flex;
-      min-height: 100vh;
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto;
+      background:linear-gradient(180deg,#020617,#020617 30%,#020617);
+      color:var(--text);
     }
 
-    /* SIDEBAR DISPOZITIVE */
+    header{
+      padding:16px 20px; border-bottom:1px solid var(--border);
+      display:flex; align-items:center; justify-content:space-between;
+    }
+    header h1{font-size:18px; margin:0}
+    header .sub{color:var(--muted); font-size:12px}
 
-    .sidebar {
-      width: 280px;
-      background: #020617;
-      border-right: 1px solid rgba(148,163,184,0.25);
-      padding: 16px;
-      overflow-y: auto;
+    .wrap{max-width:1100px; margin:0 auto; padding:16px}
+
+    .grid{display:grid; gap:14px}
+    .grid-2{grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+
+    .card{
+      background:rgba(17,24,39,.95);
+      border:1px solid var(--border);
+      border-radius:14px;
+      padding:14px;
+      box-shadow:0 10px 30px rgba(0,0,0,.25);
+    }
+    .card-header{display:flex; align-items:center; justify-content:space-between; margin-bottom:8px}
+    .card-title{font-weight:600}
+
+    .tag{font-size:11px; padding:3px 8px; border-radius:999px; border:1px solid var(--border)}
+    .tag-global{color:#a7f3d0; border-color:#065f46}
+    .tag-room{color:#bae6fd; border-color:#075985}
+
+    label{display:block; font-size:12px; color:var(--muted); margin-top:8px}
+    input{
+      width:100%; padding:8px 10px; border-radius:8px;
+      border:1px solid var(--border); background:#020617; color:var(--text)
     }
 
-    .sidebar h2 {
-      margin: 0 0 10px;
-      font-size: 1.1rem;
+    .row{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+
+    button{
+      margin-top:12px; padding:10px 14px; border-radius:10px;
+      border:1px solid var(--border); background:#020617; color:var(--text);
+      cursor:pointer; font-weight:600
     }
+    button.primary{background:linear-gradient(135deg,#22c55e,#16a34a); border:none; color:#052e16}
 
-    /* ZONA PRINCIPALĂ */
+    .status{font-size:12px; margin-top:6px}
+    .status.ok{color:var(--accent)}
+    .status.err{color:var(--err)}
 
-    .main {
-      flex: 1;
-      padding: 20px;
-      overflow-y: auto;
-    }
-
-    .main-header {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: 8px;
-      margin-bottom: 8px;
-    }
-
-    .main-header h1 {
-      margin: 0;
-      font-size: 1.5rem;
-    }
-
-    .main-header .subtitle {
-      font-size: 0.85rem;
-      color: var(--muted);
-    }
-
-    .badge-row {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-      font-size: 0.75rem;
-    }
-
-    .badge {
-      padding: 3px 8px;
-      border-radius: 999px;
-      border: 1px solid rgba(148,163,184,0.4);
-      color: var(--muted);
-    }
-
-    .badge-mqtt { border-color: rgba(56,189,248,0.7); color: var(--accent); }
-    .badge-ts   { border-color: rgba(34,197,94,0.7);  color: var(--accent2); }
-
-    /* TAB-URI */
-
-    .tabs {
-      margin-top: 6px;
-      margin-bottom: 10px;
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-    }
-
-    .tab-btn {
-      border-radius: 999px;
-      border: 1px solid rgba(148,163,184,0.35);
-      background: rgba(15,23,42,0.9);
-      color: var(--muted);
-      padding: 6px 12px;
-      font-size: 0.8rem;
-      cursor: pointer;
-    }
-
-    .tab-btn.active {
-      background: linear-gradient(135deg, #0ea5e9, #22c55e);
-      color: #0b1120;
-      border-color: transparent;
-      font-weight: 600;
-    }
-
-    .tab-btn:hover {
-      filter: brightness(1.05);
-    }
-
-    .hidden { display: none; }
-
-    /* CARD DISPOZITIV (sidebar) */
-
-    .device-card {
-      background: #020617;
-      border: 1px solid rgba(148,163,184,0.35);
-      border-radius: 12px;
-      padding: 12px;
-      margin-bottom: 12px;
-      box-shadow: 0 8px 20px rgba(0,0,0,0.35);
-    }
-
-    .device-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 8px;
-    }
-
-    .device-id {
-      font-weight: 600;
-      font-size: 0.95rem;
-    }
-
-    .status-dot {
-      width: 10px;
-      height: 10px;
-      border-radius: 999px;
-      display: inline-block;
-    }
-
-    .online { background: var(--success); }
-    .offline { background: var(--danger); }
-
-    .device-body {
-      font-size: 0.85rem;
-    }
-
-    .controls {
-      margin-top: 6px;
-    }
-
-    .controls button {
-      background: var(--accent);
-      border: none;
-      padding: 5px 9px;
-      border-radius: 8px;
-      margin-right: 6px;
-      margin-top: 4px;
-      cursor: pointer;
-      font-size: 0.8rem;
-      font-weight: 500;
-    }
-
-    .controls button:hover {
-      filter: brightness(1.1);
-    }
-
-    /* LOG GLOBAL */
-
-    .log-panel {
-      margin-top: 8px;
-      background: #020617;
-      border-radius: 12px;
-      border: 1px solid rgba(148,163,184,0.35);
-      padding: 10px 12px;
-      max-height: 260px;
-      overflow-y: auto;
-      font-size: 0.85rem;
-    }
-
-    .log-panel div {
-      padding: 2px 0;
-    }
-
-    /* GRID + CARDURI CONFIG */
-
-    .section-title {
-      margin-top: 18px;
-      margin-bottom: 4px;
-      font-size: 1rem;
-      font-weight: 600;
-    }
-
-    .section-subtitle {
-      font-size: 0.8rem;
-      color: var(--muted);
-      margin-bottom: 10px;
-    }
-
-    .grid {
-        display: grid;
-        gap: 16px;
-        max-width: 980px;
-        margin: 0 auto;
-    }
-
-    @media (min-width: 768px) {
-        .grid-2 {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-        .grid-3 {
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-        }
-    }
-
-    .card {
-        background: linear-gradient(135deg, rgba(15,23,42,0.95), rgba(15,23,42,0.8));
-        border-radius: 14px;
-        padding: 14px 14px 12px;
-        box-shadow: 0 18px 40px rgba(0,0,0,0.5);
-        border: 1px solid rgba(148,163,184,0.15);
-        position: relative;
-        overflow: hidden;
-    }
-
-    .card::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        background: radial-gradient(circle at top left, rgba(56,189,248,0.12), transparent 55%);
-        opacity: 0.7;
-        pointer-events: none;
-    }
-
-    .card-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        margin-bottom: 8px;
-        position: relative;
-        z-index: 1;
-    }
-
-    .card-title {
-        font-size: 1.05rem;
-        font-weight: 600;
-    }
-
-    .tag {
-        font-size: 0.75rem;
-        padding: 3px 8px;
-        border-radius: 999px;
-        border: 1px solid rgba(148,163,184,0.4);
-        color: var(--muted);
-        backdrop-filter: blur(6px);
-    }
-
-    .tag-global { border-color: rgba(56,189,248,0.8); color: var(--accent); }
-    .tag-room   { border-color: rgba(34,197,94,0.7);  color: var(--accent2); }
-
-    .row {
-        display: flex;
-        gap: 8px;
-        margin-bottom: 6px;
-        position: relative;
-        z-index: 1;
-    }
-
-    .field {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        gap: 2px;
-    }
-
-    label {
-        font-size: 0.8rem;
-        color: var(--muted);
-    }
-
-    input, select {
-        border-radius: 8px;
-        border: 1px solid rgba(148,163,184,0.35);
-        background: rgba(15,23,42,0.9);
-        color: var(--text);
-        padding: 6px 8px;
-        font-size: 0.9rem;
-        outline: none;
-    }
-
-    input:focus, select:focus {
-        border-color: var(--accent);
-        box-shadow: 0 0 0 1px rgba(56,189,248,0.3);
-    }
-
-    button.btn-primary {
-        border-radius: 999px;
-        border: none;
-        padding: 8px 10px;
-        font-size: 0.9rem;
-        font-weight: 600;
-        cursor: pointer;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-        margin-top: 4px;
-        background: linear-gradient(135deg, #0ea5e9, #22c55e);
-        color: #0b1120;
-    }
-
-    button.btn-primary:hover {
-        filter: brightness(1.05);
-    }
-
-    .status {
-        margin-top: 6px;
-        font-size: 0.75rem;
-        min-height: 16px;
-        color: var(--muted);
-        position: relative;
-        z-index: 1;
-    }
-
-    .status.ok { color: #4ade80; }
-    .status.err { color: #f97373; }
-    <!-- SAVE ALL -->
-    <div class="card" style="max-width:980px;margin:14px auto 0;">
-      <div class="card-header">
-        <div class="card-title">Salvare completă</div>
-        <span class="tag tag-global">Global + Camere</span>
-      </div>
-    
-      <button class="btn-primary" onclick="saveAllConfig()">
-        💾 Salvează TOT (ce e completat)
-      </button>
-      <div id="status-all" class="status"></div>
-    
-      <div class="section-subtitle" style="margin:10px 0 0;">
-        Trimite într-o singură cerere doar câmpurile completate (nu suprascrie câmpuri goale).
-      </div>
-    </div>
-
-    .footer {
-        max-width: 960px;
-        margin: 14px auto 0;
-        font-size: 0.7rem;
-        text-align: center;
-        color: var(--muted);
-    }
-
-    a {
-        color: var(--accent);
-        text-decoration: none;
-    }
-
-    /* --- STILURI PENTRU GRAFICE --- */
-
-    .chart-wrapper {
-      position: relative;
-      height: 320px;
-      max-height: 320px;
-      overflow: hidden;
-      z-index: 1;
-    }
-
-    @media (max-width: 600px) {
-      .chart-wrapper {
-        height: 260px;
-        max-height: 260px;
-      }
-    }
-
-    .filter-bar {
-      position: relative;
-      z-index: 1;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      align-items: center;
-      margin-bottom: 10px;
-      font-size: 0.85rem;
-    }
-
-    .filter-bar label {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      color: var(--muted);
-    }
-
-    .filter-bar input[type="date"] {
-      background: rgba(15,23,42,0.95);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      color: var(--text);
-      padding: 4px 8px;
-      font-size: 0.8rem;
-      outline: none;
-    }
-
-    .filter-bar input[type="date"]:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 1px rgba(56,189,248,0.4);
-    }
-
-    .filter-bar button {
-      border-radius: 999px;
-      border: 1px solid var(--border);
-      padding: 5px 10px;
-      font-size: 0.8rem;
-      cursor: pointer;
-      background: rgba(15,23,42,0.95);
-      color: var(--text);
-    }
-
-    .filter-bar button.primary {
-      background: linear-gradient(135deg, #0ea5e9, #22c55e);
-      border: none;
-      color: #0b1120;
-      font-weight: 600;
-    }
-
-    .filter-bar button:hover {
-      filter: brightness(1.05);
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.8rem;
-      position: relative;
-      z-index: 1;
-    }
-
-    th, td {
-      border-bottom: 1px solid rgba(148,163,184,0.25);
-      padding: 4px 6px;
-      text-align: center;
-    }
-
-    th {
-      color: var(--muted);
-      font-weight: 500;
-    }
-
-    tr:nth-child(even) td {
-      background: rgba(15,23,42,0.6);
-    }
-
-    .no-data {
-      font-size: 0.85rem;
-      color: var(--muted);
-      margin-top: 6px;
-    }
-
+    footer{margin:20px 0; text-align:center; color:var(--muted); font-size:12px}
   </style>
 </head>
 <body>
 
-  <!-- SIDEBAR: dispozitive ESP32 -->
-  <div class="sidebar">
-    <h2>Dispozitive ESP32</h2>
-    <div id="deviceList"></div>
+<header>
+  <div>
+    <h1>Gospodărie – Dashboard Config</h1>
+    <div class="sub">Control centralizat ESP32 · ThingSpeak · MQTT</div>
+  </div>
+</header>
+
+<div class="wrap" id="view-control">
+
+  <!-- GLOBAL CONFIG -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-title">Setări globale</div>
+      <span class="tag tag-global">GLOBAL</span>
+    </div>
+
+    <label>Sleep minutes</label>
+    <input id="g_sleep" type="number" placeholder="ex: 5" />
+
+    <label>Debug (0/1)</label>
+    <input id="g_debug" type="number" placeholder="1" />
   </div>
 
-  <!-- MAIN: MQTT + LOG + CONFIG + GRAFICE -->
-  <div class="main">
+  <!-- ROOMS -->
+  <div class="grid grid-2" style="margin-top:14px;">
 
-    <div class="main-header">
-      <div>
-        <h1>Panou Gospodărie</h1>
-        <div class="subtitle">Status live & comenzi prin MQTT · Config & grafice ThingSpeak</div>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Cameră</div>
+        <span class="tag tag-room">Camara</span>
       </div>
-      <div class="badge-row">
-        <span class="badge badge-mqtt">MQTT – HiveMQ Cloud</span>
-        <span class="badge badge-ts">ThingSpeak – CONFIG & DATA</span>
+
+      <div class="row">
+        <div>
+          <label>Alarmă Temp</label>
+          <input id="cam_temp" type="number" placeholder="°C" />
+        </div>
+        <div>
+          <label>Alarmă Umid</label>
+          <input id="cam_hum" type="number" placeholder="%" />
+        </div>
       </div>
     </div>
 
-    <!-- TAB-URI -->
-    <div class="tabs">
-      <button class="tab-btn active" data-view="control">Control & Config</button>
-      <button class="tab-btn" data-view="charts">Grafice temperatură</button>
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Bucătărie</div>
+        <span class="tag tag-room">Bucatarie</span>
+      </div>
+
+      <div class="row">
+        <div>
+          <label>Alarmă Temp</label>
+          <input id="buc_temp" type="number" placeholder="°C" />
+        </div>
+        <div>
+          <label>Alarmă Umid</label>
+          <input id="buc_hum" type="number" placeholder="%" />
+        </div>
+      </div>
     </div>
 
-    <!-- ============ VIEW CONTROL (LOG + CONFIG) ============ -->
-    <div id="view-control">
-      <!-- LOG GLOBAL MQTT -->
-      <div id="globalLog" class="log-panel">
-        <div style="opacity:0.6;font-size:0.85rem;">
-          Aici vor apărea ultimele mesaje de la dispozitive (log, erori senzori, ping etc.).
-        </div>
-      </div>
+  </div>
 
-      <!-- SECȚIUNE CONFIG THINGSPEAK -->
-      <div class="section-title">Configurare senzori</div>
-      <div class="section-subtitle">
-        Panoul de mai jos trimite comenzi către ThingSpeak (CONFIG – Gospodărie, ID: 1622205), iar ESP32 citește aceste valori la următorul ciclu.
-      </div>
+  <!-- SAVE ALL -->
+  <div class="card" style="margin-top:14px;">
+    <div class="card-header">
+      <div class="card-title">Salvare configurație</div>
+      <span class="tag tag-global">ALL</span>
+    </div>
 
-      <div class="grid grid-2">
+    <button class="primary" onclick="saveAllConfig()">💾 Salvează TOT</button>
+    <div id="status-all" class="status"></div>
+  </div>
 
-        <!-- GLOBAL -->
-        <div class="card">
-            <div class="card-header">
-                <div class="card-title">Setări globale</div>
-                <span class="tag tag-global">Global</span>
-            </div>
+</div>
 
-            <div class="row">
-                <div class="field">
-                    <label for="sleep_minutes">Sleep (minute) – field1</label>
-                    <input id="sleep_minutes" type="number" min="1" max="180" placeholder="ex: 30">
-                </div>
-                <div class="field">
-                    <label for="debug">DEBUGGING – field8</label>
-                    <select id="debug">
-                        <option value="">(nu modific)</option>
-                        <option value="1">1 – DEBUG ON (fără sleep)</option>
-                        <option value="0">0 – PROD (cu sleep)</option>
-                    </select>
-                </div>
-            </div>
+<footer>
+  © Gospodărie · Dashboard simplu & robust
+</footer>
 
-            <button class="btn-primary" onclick="
-                const sleepVal = document.getElementById('sleep_minutes').value;
-                const debugVal = document.getElementById('debug').value;
-                const fields = {};
-                if (sleepVal !== '') fields['field1'] = Number(sleepVal);
-                if (debugVal !== '') fields['field8'] = Number(debugVal);
-                sendConfig(fields, 'status-global');
-            ">
-                💾 Salvează globale
-            </button>
-            <div id="status-global" class="status"></div>
-        </div>
+<script>
+  const WRITE_KEY = "ZPT57WZJNMLGM2X1"; // ThingSpeak WRITE KEY
 
-        <!-- CAMARA -->
-        <div class="card">
-            <div class="card-header">
-                <div class="card-title">Cămară (EC62609C8900)</div>
-                <span class="tag tag-room">Camara · fields 2–3</span>
-            </div>
+  function qs(id){return document.getElementById(id).value}
 
-            <div class="row">
-                <div class="field">
-                    <label for="camara_temp">Prag temperatură (°C) – field2</label>
-                    <input id="camara_temp" type="number" step="0.1" placeholder="ex: 25">
-                </div>
-                <div class="field">
-                    <label for="camara_hum">Prag umiditate (%) – field3</label>
-                    <input id="camara_hum" type="number" step="1" placeholder="ex: 60">
-                </div>
-            </div>
+  function saveAllConfig(){
+    let params = [];
 
-            <button class="btn-primary" onclick="
-                const t = document.getElementById('camara_temp').value;
-                const h = document.getElementById('camara_hum').value;
-                const fields = {};
-                if (t !== '') fields['field2'] = Number(t);
-                if (h !== '') fields['field3'] = Number(h);
-                sendConfig(fields, 'status-camara');
-            ">
-                💾 Salvează Cămară
-            </button>
-            <div id="status-camara" class="status"></div>
-        </div>
+    if(qs('g_sleep')) params.push('field1='+qs('g_sleep'));
+    if(qs('g_debug')) params.push('field8='+qs('g_debug'));
 
-      </div>
+    if(qs('cam_temp')) params.push('field2='+qs('cam_temp'));
+    if(qs('cam_hum'))  params.push('field3='+qs('cam_hum'));
 
-      <div class="grid grid-2" style="margin-top:10px;">
+    if(qs('buc_temp')) params.push('field6='+qs('buc_temp'));
+    if(qs('buc_hum'))  params.push('field7='+qs('buc_hum'));
 
-        <!-- BAIE -->
-        <div class="card">
-            <div class="card-header">
-                <div class="card-title">Baie</div>
-                <span class="tag tag-room">Baie · fields 4–5</span>
-            </div>
-
-            <div class="row">
-                <div class="field">
-                    <label for="baie_temp">Prag temperatură (°C) – field4</label>
-                    <input id="baie_temp" type="number" step="0.1" placeholder="ex: 28">
-                </div>
-                <div class="field">
-                    <label for="baie_hum">Prag umiditate (%) – field5</label>
-                    <input id="baie_hum" type="number" step="1" placeholder="ex: 75">
-                </div>
-            </div>
-
-            <button class="btn-primary" onclick="
-                const t = document.getElementById('baie_temp').value;
-                const h = document.getElementById('baie_hum').value;
-                const fields = {};
-                if (t !== '') fields['field4'] = Number(t);
-                if (h !== '') fields['field5'] = Number(h);
-                sendConfig(fields, 'status-baie');
-            ">
-                💾 Salvează Baie
-            </button>
-            <div id="status-baie" class="status"></div>
-        </div>
-
-        <!-- BUCATARIE -->
-        <div class="card">
-            <div class="card-header">
-                <div class="card-title">Bucătărie (7821849F8900)</div>
-                <span class="tag tag-room">Bucătărie · fields 6–7</span>
-            </div>
-
-            <div class="row">
-                <div class="field">
-                    <label for="buc_temp">Prag temperatură (°C) – field6</label>
-                    <input id="buc_temp" type="number" step="0.1" placeholder="ex: 27">
-                </div>
-                <div class="field">
-                    <label for="buc_hum">Prag umiditate (%) – field7</label>
-                    <input id="buc_hum" type="number" step="1" placeholder="ex: 70">
-                </div>
-            </div>
-
-            <button class="btn-primary" onclick="
-                const t = document.getElementById('buc_temp').value;
-                const h = document.getElementById('buc_hum').value;
-                const fields = {};
-                if (t !== '') fields['field6'] = Number(t);
-                if (h !== '') fields['field7'] = Number(h);
-                sendConfig(fields, 'status-buc');
-            ">
-                💾 Salvează Bucătărie
-            </button>
-            <div id="status-buc" class="status"></div>
-        </div>
-
-      </div>
-
-      <div class="footer">
-          Panoul trimite direct comenzi către ThingSpeak prin API-ul <code>update</code>.<br>
-          După salvare, valorile apar în canalul <strong>CONFIG – Gospodărie (1622205)</strong>, iar ESP32 le va citi la următorul ciclu.
-      </div>
-    </div> <!-- end #view-control -->
-
-    <!-- ============ VIEW CHARTS (GRAFICE) ============ -->
-    <div id="view-charts" class="hidden">
-      <div class="card">
-        <div class="card-header">
-          <div>
-            <div class="card-title">Evoluție temperatură</div>
-            <div style="font-size:0.8rem;color:var(--muted);">
-              Roșu = Cămară (field1) · Albastru = Bucătărie (field5) · canal DATA 1613849
-            </div>
-          </div>
-          <span class="tag">Grafice interactive</span>
-        </div>
-
-        <!-- FILTRE DATA -->
-        <div class="filter-bar">
-          <label>
-            De la:
-            <input type="date" id="dateFrom">
-          </label>
-          <label>
-            Până la:
-            <input type="date" id="dateTo">
-          </label>
-
-          <button id="btnToday">Astăzi</button>
-          <button id="btnLast24">Ultimele 24h</button>
-          <button id="btnApply" class="primary">Aplică filtrul</button>
-        </div>
-
-        <!-- GRAFIC -->
-        <div class="chart-wrapper">
-          <canvas id="tempChart"></canvas>
-        </div>
-
-        <div id="chartMessage" class="no-data"></div>
-      </div>
-
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">Statistici – ultimele 7 zile</div>
-          <span class="tag">Min / Max pe zi · Cămară & Bucătărie</span>
-        </div>
-
-        <div class="grid grid-2">
-          <div>
-            <h3 style="margin:0 0 4px;font-size:0.85rem;">Cămară (field1)</h3>
-            <table>
-              <thead>
-                <tr>
-                  <th>Data</th>
-                  <th>Min (°C)</th>
-                  <th>Max (°C)</th>
-                </tr>
-              </thead>
-              <tbody id="tblCamara"></tbody>
-            </table>
-          </div>
-
-          <div>
-            <h3 style="margin:0 0 4px;font-size:0.85rem;">Bucătărie (field5)</h3>
-            <table>
-              <thead>
-                <tr>
-                  <th>Data</th>
-                  <th>Min (°C)</th>
-                  <th>Max (°C)</th>
-                </tr>
-              </thead>
-              <tbody id="tblBucatarie"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div> <!-- end #view-charts -->
-
-  </div> <!-- end .main -->
-
-  <!-- SCRIPT COMUN: ThingSpeak + MQTT + GRAFICE -->
-  <script>
-    /* ====================== THINGSPEAK CONFIG ====================== */
-
-    const API_KEY = "L7AUPY13P0E0KJV9";
-    const BASE_URL = "https://api.thingspeak.com/update";
-
-    async function sendConfig(fields, statusId) {
-        const statusEl = document.getElementById(statusId);
-        statusEl.textContent = "Trimit configurarea...";
-        statusEl.className = "status";
-
-        let payload = "api_key=" + API_KEY;
-
-        Object.entries(fields).forEach(([f, v]) => {
-            if (v !== "" && v != null && !Number.isNaN(v)) {
-                payload += `&${f}=${encodeURIComponent(v)}`;
-            }
-        });
-
-        try {
-            const response = await fetch(BASE_URL, {
-                method: "POST",
-                headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                body: payload
-            });
-
-            const text = await response.text();
-
-            if (parseInt(text) > 0) {
-                statusEl.textContent = "✔ Config trimisă (entry " + text + ")";
-                statusEl.className = "status ok";
-            } else {
-                statusEl.textContent = "❌ Eroare ThingSpeak (" + text + ")";
-                statusEl.className = "status err";
-            }
-
-        } catch (err) {
-            statusEl.textContent = "❌ Eroare: " + err;
-            statusEl.className = "status err";
-        }
-    }
-    function v(id) {
-      const el = document.getElementById(id);
-      return el ? el.value : "";
-    }
-    
-    function saveAllConfig() {
-      const fields = {};
-    
-      // GLOBAL
-      const sleepVal = v('sleep_minutes');
-      const debugVal = v('debug');
-      if (sleepVal !== '') fields['field1'] = Number(sleepVal);
-      if (debugVal !== '') fields['field8'] = Number(debugVal);
-    
-      // CAMARA
-      const camT = v('camara_temp');
-      const camH = v('camara_hum');
-      if (camT !== '') fields['field2'] = Number(camT);
-      if (camH !== '') fields['field3'] = Number(camH);
-    
-      // BAIE
-      const baiT = v('baie_temp');
-      const baiH = v('baie_hum');
-      if (baiT !== '') fields['field4'] = Number(baiT);
-      if (baiH !== '') fields['field5'] = Number(baiH);
-    
-      // BUCATARIE
-      const bucT = v('buc_temp');
-      const bucH = v('buc_hum');
-      if (bucT !== '') fields['field6'] = Number(bucT);
-      if (bucH !== '') fields['field7'] = Number(bucH);
-    
-      sendConfig(fields, 'status-all');
+    if(params.length===0){
+      setStatus('status-all','Nimic de salvat','err');
+      return;
     }
 
-    // Mapare ID ESP32 -> nume prietenos
-    const DEVICE_LABELS = {
-      "EC62609C8900": "Cămară",
-      "7821849F8900": "Bucătărie",
-      "XXXXXXXXXXXX": "Baie"   // înlocuiești cu ID-ul real când îl ai
-    };
+    const url = `https://api.thingspeak.com/update?api_key=${WRITE_KEY}&`+params.join('&');
 
-    /* ====================== GRAFICE (ThingSpeak DATA) ====================== */
+    fetch(url)
+      .then(r=>r.text())
+      .then(t=>{
+        if(t!=='0') setStatus('status-all','Config salvat ✔','ok');
+        else setStatus('status-all','Eroare ThingSpeak','err');
+      })
+      .catch(()=>setStatus('status-all','Network error','err'));
+  }
 
-    const CHANNEL_ID = 1613849;     // DATA – Gospodărie
-    const RESULTS    = 800;
-    const URL_DATA   = `https://api.thingspeak.com/channels/${CHANNEL_ID}/feeds.json?results=${RESULTS}`;
-
-    let allPoints = [];
-    let tempChart = null;
-
-    Chart.register(ChartDataLabels);
-
-    function sameDay(d1, d2) {
-      return d1.getFullYear() === d2.getFullYear() &&
-             d1.getMonth()    === d2.getMonth() &&
-             d1.getDate()     === d2.getDate();
-    }
-
-    function toDateString(d) {
-      return d.toISOString().slice(0, 10);
-    }
-
-    function renderChart(points) {
-      const msgEl = document.getElementById('chartMessage');
-      if (!msgEl) return; // dacă suntem într-o versiune fără charts
-
-      if (!points.length) {
-        if (tempChart) {
-          tempChart.destroy();
-          tempChart = null;
-        }
-        msgEl.textContent = "Nu există date pentru intervalul selectat.";
-        return;
-      } else {
-        msgEl.textContent = "";
-      }
-
-      const labels = points.map(p =>
-        p.time.toLocaleTimeString('ro-RO', { hour: '2-digit', minute: '2-digit' })
-      );
-      const camData = points.map(p => p.cam);
-      const bucData = points.map(p => p.buc);
-
-      const canvas = document.getElementById('tempChart');
-      if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      if (tempChart) tempChart.destroy();
-
-      tempChart = new Chart(ctx, {
-        type: 'line',
-        data: {
-          labels,
-          datasets: [
-            {
-              label: 'Cămară',
-              data: camData,
-              borderColor: 'rgba(239,68,68,0.9)',
-              backgroundColor: 'rgba(239,68,68,0.25)',
-              tension: 0.25,
-              spanGaps: true,
-              pointRadius: 2
-            },
-            {
-              label: 'Bucătărie',
-              data: bucData,
-              borderColor: 'rgba(56,189,248,0.9)',
-              backgroundColor: 'rgba(56,189,248,0.25)',
-              tension: 0.25,
-              spanGaps: true,
-              pointRadius: 2
-            }
-          ]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          interaction: {
-            mode: 'nearest',
-            intersect: false
-          },
-          plugins: {
-            legend: {
-              labels: { color: '#e5e7eb', font: { size: 11 } }
-            },
-            tooltip: {
-              callbacks: {
-                label: ctx => {
-                  const v = ctx.parsed.y;
-                  if (v == null) return '';
-                  return `${ctx.dataset.label}: ${v.toFixed(1)} °C`;
-                }
-              }
-            },
-            datalabels: {
-              color: '#e5e7eb',
-              align: 'top',
-              anchor: 'end',
-              clamp: true,
-              display: ctx => ctx.dataIndex % 6 === 0,
-              formatter: v => (v == null ? '' : v.toFixed(1)),
-              font: { size: 9 }
-            }
-          },
-          scales: {
-            x: {
-              ticks: {
-                color: '#9ca3af',
-                maxRotation: 0,
-                autoSkip: true,
-                maxTicksLimit: 10
-              },
-              grid: { color: 'rgba(75,85,99,0.3)' }
-            },
-            y: {
-              ticks: {
-                color: '#9ca3af',
-                callback: v => v + '°C'
-              },
-              grid: { color: 'rgba(75,85,99,0.3)' }
-            }
-          }
-        }
-      });
-    }
-
-    function computeLast7DaysStats() {
-      const tblCam = document.getElementById('tblCamara');
-      const tblBuc = document.getElementById('tblBucatarie');
-      if (!tblCam || !tblBuc) return;
-
-      tblCam.innerHTML = '';
-      tblBuc.innerHTML = '';
-
-      if (!allPoints.length) return;
-
-      const dayMap = new Map();
-
-      allPoints.forEach(p => {
-        const key = toDateString(p.time);
-        if (!dayMap.has(key)) {
-          dayMap.set(key, { cam: [], buc: [] });
-        }
-        if (p.cam != null) dayMap.get(key).cam.push(p.cam);
-        if (p.buc != null) dayMap.get(key).buc.push(p.buc);
-      });
-
-      const days = Array.from(dayMap.keys()).sort();
-      const last7 = days.slice(-7);
-
-      last7.forEach(d => {
-        const entry = dayMap.get(d);
-
-        // Cămară
-        if (entry.cam.length) {
-          const minC = Math.min.apply(null, entry.cam);
-          const maxC = Math.max.apply(null, entry.cam);
-          const tr = document.createElement('tr');
-          tr.innerHTML = `
-            <td>${d}</td>
-            <td>${minC.toFixed(1)}</td>
-            <td>${maxC.toFixed(1)}</td>
-          `;
-          tblCam.appendChild(tr);
-        } else {
-          const tr = document.createElement('tr');
-          tr.innerHTML = `<td>${d}</td><td>-</td><td>-</td>`;
-          tblCam.appendChild(tr);
-        }
-
-        // Bucătărie
-        if (entry.buc.length) {
-          const minB = Math.min.apply(null, entry.buc);
-          const maxB = Math.max.apply(null, entry.buc);
-          const tr2 = document.createElement('tr');
-          tr2.innerHTML = `
-            <td>${d}</td>
-            <td>${minB.toFixed(1)}</td>
-            <td>${maxB.toFixed(1)}</td>
-          `;
-          tblBuc.appendChild(tr2);
-        } else {
-          const tr2 = document.createElement('tr');
-          tr2.innerHTML = `<td>${d}</td><td>-</td><td>-</td>`;
-          tblBuc.appendChild(tr2);
-        }
-      });
-    }
-
-    function applyTodayFilter() {
-      if (!allPoints.length) return;
-      const today = new Date();
-      const todayPoints = allPoints.filter(p => sameDay(p.time, today));
-      if (!todayPoints.length) {
-        const fallback = allPoints.slice(-100);
-        renderChart(fallback);
-        const msgEl = document.getElementById('chartMessage');
-        if (msgEl)
-          msgEl.textContent = "Nu există date pentru astăzi – se afișează ultimele valori disponibile.";
-      } else {
-        renderChart(todayPoints);
-      }
-
-      const isoToday = toDateString(today);
-      const df = document.getElementById('dateFrom');
-      const dt = document.getElementById('dateTo');
-      if (df) df.value = isoToday;
-      if (dt) dt.value = isoToday;
-    }
-
-    function applyLast24hFilter() {
-      if (!allPoints.length) return;
-      const now = new Date();
-      const limit = now.getTime() - 24 * 60 * 60 * 1000;
-      const filtered = allPoints.filter(p => p.time.getTime() >= limit);
-      renderChart(filtered);
-    }
-
-    function applyCustomRange() {
-      if (!allPoints.length) return;
-
-      const df = document.getElementById('dateFrom');
-      const dt = document.getElementById('dateTo');
-      if (!df || !dt) return;
-
-      const fromVal = df.value;
-      const toVal   = dt.value;
-
-      if (!fromVal && !toVal) {
-        applyTodayFilter();
-        return;
-      }
-
-      let fromTime = null;
-      let toTime   = null;
-
-      if (fromVal) fromTime = new Date(fromVal + 'T00:00:00');
-      if (toVal)   toTime   = new Date(toVal   + 'T23:59:59');
-
-      const filtered = allPoints.filter(p => {
-        if (fromTime && p.time < fromTime) return false;
-        if (toTime   && p.time > toTime)   return false;
-        return true;
-      });
-
-      renderChart(filtered);
-    }
-
-    async function initCharts() {
-      // dacă nu există secțiunea de grafice (alt build), nu facem nimic
-      if (!document.getElementById('tempChart')) return;
-
-      try {
-        const resp = await fetch(URL_DATA);
-        const js   = await resp.json();
-        const feeds = js.feeds || [];
-
-        allPoints = feeds.map(f => {
-          const t = new Date(f.created_at);
-          const cam = f.field1 != null ? parseFloat(f.field1) : null; // Camara
-          const buc = f.field5 != null ? parseFloat(f.field5) : null; // Bucatarie
-          return { time: t, cam, buc };
-        });
-
-        applyTodayFilter();
-        computeLast7DaysStats();
-
-        const btnToday  = document.getElementById('btnToday');
-        const btn24     = document.getElementById('btnLast24');
-        const btnApply  = document.getElementById('btnApply');
-
-        if (btnToday) btnToday.addEventListener('click', applyTodayFilter);
-        if (btn24)    btn24.addEventListener('click', applyLast24hFilter);
-        if (btnApply) btnApply.addEventListener('click', applyCustomRange);
-
-      } catch (err) {
-        console.error("Eroare la citirea ThingSpeak (DATA):", err);
-        const msgEl = document.getElementById('chartMessage');
-        if (msgEl) msgEl.textContent = "Eroare la citirea datelor din ThingSpeak.";
-      }
-    }
-
-    /* ====================== MQTT DASHBOARD ====================== */
-
-    window.addEventListener("load", function () {
-      const deviceList = document.getElementById('deviceList');
-      const devices = {};
-      const globalLog = document.getElementById('globalLog');
-
-      function appendGlobalLog(text) {
-        if (!globalLog) return;
-        const line = document.createElement('div');
-        const now  = new Date().toLocaleTimeString();
-        line.textContent = `${now} · ${text}`;
-        globalLog.prepend(line);
-      }
-
-      // CONFIG MQTT
-      const host = "c72cc38c1f184d0199cc4daa938bac6f.s1.eu.hivemq.cloud";
-      const port = 8884;
-      const path = "/mqtt";
-      const mqttUser = "burlusi";
-      const mqttPass = "Burlusi166?";
-      const clientId = "webclient_" + Math.random().toString(16).substr(2, 8);
-
-      const client = new Paho.Client(host, port, path, clientId);
-
-      client.onConnectionLost = err => console.warn("Conexiune pierdută", err);
-      client.onMessageArrived = msg => {
-        const topic   = msg.destinationName;
-        const payload = msg.payloadString;
-        const parts   = topic.split("/");
-
-        if (parts.length < 3) return;
-        if (parts[0] !== "home") return;
-
-        const deviceID = parts[1];
-        if (!deviceID) return;
-
-        const subtopic = parts.slice(2).join("/");
-
-        if (!devices[deviceID]) {
-          createDeviceCard(deviceID);
-        }
-
-        if (subtopic === "status") {
-          updateStatus(deviceID, payload);
-        } else if (subtopic === "sensors") {
-          try {
-            const data = JSON.parse(payload);
-            updateSensor(deviceID, data);
-          } catch (e) {
-            console.error("Eroare parsare sensors:", e);
-          }
-        } else if (subtopic === "log") {
-          updateLog(deviceID, payload);
-        }
-      };
-
-      function connectMQTT() {
-        client.connect({
-          useSSL: true,
-          userName: mqttUser,
-          password: mqttPass,
-          onSuccess: () => {
-            console.log("✔ Conectat la broker MQTT");
-            client.subscribe("home/+/status");
-            client.subscribe("home/+/sensors");
-            client.subscribe("home/+/log");
-          },
-          onFailure: err => console.error("❌ Eroare conectare MQTT", err)
-        });
-      }
-
-      function createDeviceCard(id) {
-        const label = DEVICE_LABELS[id] || ("ESP32 " + id);
-
-        const el = document.createElement("div");
-        el.className = "device-card";
-        el.id = `dev-${id}`;
-        el.innerHTML = `
-          <div class="device-header">
-            <div>
-              <div class="device-id">${label}</div>
-              <div style="font-size:0.7rem;color:var(--muted);">${id}</div>
-            </div>
-            <span class="status-dot offline" id="status-${id}"></span>
-          </div>
-          <div class="device-body">
-            <div id="data-${id}">...</div>
-            <div id="log-${id}" style="font-size:0.75rem;color:var(--muted);margin-top:4px;">&nbsp;</div>
-            <div class="controls">
-              <button onclick="sendCmd('${id}', 'ping')">Ping</button>
-              <button onclick="sendCmd('${id}', 'reboot')">Reboot</button>
-              <button onclick="sendCmd('${id}', 'reset')">Reset</button>
-            </div>
-          </div>
-        `;
-        deviceList.appendChild(el);
-        devices[id] = true;
-      }
-
-      function updateStatus(id, payload) {
-        const dot = document.getElementById(`status-${id}`);
-        if (!dot) return;
-        dot.className = "status-dot " + (payload === "offline" ? "offline" : "online");
-      }
-
-      function updateSensor(id, data) {
-        const el = document.getElementById(`data-${id}`);
-        if (!el) return;
-        el.innerHTML = `Temp: ${data.temp}°C<br>Umiditate: ${data.hum}%`;
-      }
-
-      function updateLog(id, msg) {
-        const el = document.getElementById(`log-${id}`);
-        if (el) {
-          el.textContent = msg;
-        }
-        appendGlobalLog(`[${id}] ${msg}`);
-      }
-
-      window.sendCmd = function(id, cmd) {
-        const topic = `home/${id}/cmd/${cmd}`;
-        const msg = new Paho.Message("");
-        msg.destinationName = topic;
-        client.send(msg);
-        console.log("Trimis comanda", cmd, "către", topic);
-      };
-
-      // TAB-URI: schimbă între Control & Grafice
-      const tabButtons = document.querySelectorAll('.tab-btn');
-      const viewControl = document.getElementById('view-control');
-      const viewCharts  = document.getElementById('view-charts');
-
-      tabButtons.forEach(btn => {
-        btn.addEventListener('click', () => {
-          tabButtons.forEach(b => b.classList.remove('active'));
-          btn.addEventListener;
-          btn.classList.add('active');
-
-          const view = btn.dataset.view;
-          if (view === 'control') {
-            viewControl.classList.remove('hidden');
-            viewCharts.classList.add('hidden');
-          } else {
-            viewCharts.classList.remove('hidden');
-            viewControl.classList.add('hidden');
-          }
-        });
-      });
-
-      connectMQTT();
-      initCharts();  // pornește logica de grafice / ThingSpeak DATA
-    });
-  </script>
+  function setStatus(id,msg,type){
+    const el=document.getElementById(id);
+    el.textContent=msg; el.className='status '+type;
+  }
+</script>
 
 </body>
 </html>
