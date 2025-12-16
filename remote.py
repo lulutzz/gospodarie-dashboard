@@ -7,6 +7,7 @@ import ubinascii
 import machine
 from machine import Pin, WDT, deepsleep
 import gc
+import mod_dht
 THINGSPEAK_BASE = "http://api.thingspeak.com"  # IMPORTANT: fără TLS ca să nu mai pice cu -17040
 
 # ===================== LOG (merge în Dashboard prin main.py) =====================
@@ -57,6 +58,8 @@ pwr_pin  = Pin(SENSOR_PWR_PIN, Pin.OUT, value=0)
 data_pin = Pin(SENSOR_DATA_PIN, Pin.IN)
 
 wdt = WDT(timeout=60000)
+mod_dht.init(SENSOR_PWR_PIN, SENSOR_DATA_PIN, log_fn=log, wdt=wdt)
+log("mod_dht init OK")
 
 def get_device_id():
     try:
@@ -241,46 +244,6 @@ def send_telegram(msg):
         log("TG ERROR: {}".format(e))
         return False
 
-# ===================== DHT11 (medie) =====================
-def read_dht(samples=5, delay_s=1):
-    log("DHT: power ON")
-    pwr_pin.value(1)
-    time.sleep(2)
-
-    sensor = dht.DHT11(Pin(SENSOR_DATA_PIN, Pin.IN))
-    temps = []
-    hums  = []
-
-    for i in range(1, samples + 1):
-        try:
-            wdt.feed()
-            sensor.measure()
-            t = sensor.temperature()
-            h = sensor.humidity()
-            log("DHT read {}/{}: T={} H={}".format(i, samples, t, h))
-
-            if t is not None and h is not None:
-                temps.append(t)
-                hums.append(h)
-        except Exception as e:
-            log("DHT ERROR sample {}: {}".format(i, e))
-
-        time.sleep(delay_s)
-
-    # IMPORTANT: data high-Z înainte de OFF ca să nu alimentezi prin DATA
-    Pin(SENSOR_DATA_PIN, Pin.IN)
-    pwr_pin.value(0)
-    log("DHT: power OFF")
-
-    if temps and hums:
-        avg_t = int(sum(temps) / len(temps) + 0.5)
-        avg_h = int(sum(hums)  / len(hums)  + 0.5)
-        log("DHT AVG: T={} H={}".format(avg_t, avg_h))
-        return avg_t, avg_h
-
-    log("DHT: no valid reads")
-    return None, None
-
 # ===================== LOOP principal (nu iese) =====================
 log("start | ID={} | ROOM={} | cfg_fields={} | data_fields={}".format(
     DEVICE_ID, ROOM, cfg_fields, data_fields
@@ -297,7 +260,8 @@ while True:
             continue
 
         cfg = fetch_config()
-        t, h = read_dht()
+        #t, h = read_dht()
+        t, h = mod_dht.read(samples=5, delay_s=1)
 
         if t is None or h is None:
             log("cycle: DHT invalid -> skip TS/alerts")
